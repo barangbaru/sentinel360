@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from .database import engine, get_db, Base, SessionLocal
@@ -24,6 +25,10 @@ from .scheduler import start_scheduler
 
 # Create the SQLite tables
 Base.metadata.create_all(bind=engine)
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 # ==========================================
 # PASSWORD HASHING UTILITIES
@@ -175,6 +180,21 @@ async def login_submit(request: Request, db: Session = Depends(get_db)):
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/api/user/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not verify_password(data.old_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password lama salah"
+        )
+    current_user.password_hash = hash_password(data.new_password)
+    db.commit()
+    return {"detail": "Password berhasil diubah"}
 
 # ==========================================
 # WEB PAGE ROUTES (UI)

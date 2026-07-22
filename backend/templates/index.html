@@ -14,8 +14,8 @@
             <span class="logo-text">Sentinel360</span>
             <span class="logo-badge">V1.0</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 1.25rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-right: 0.5rem;">
                 <span style="color: var(--text-secondary);">User:</span>
                 <strong style="color: var(--text-primary)">{{ username }}</strong>
                 <span class="monitor-type-badge" style="background: rgba(99, 102, 241, 0.15); border-color: var(--accent); color: var(--text-primary); font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 4px;">{{ role }}</span>
@@ -23,6 +23,10 @@
             
             <button id="add-server-btn" class="btn btn-primary">
                 <span>+</span> Tambah Server
+            </button>
+            
+            <button id="change-pwd-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                Ganti Password
             </button>
             
             <a href="/logout" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; text-decoration: none;">
@@ -140,10 +144,38 @@
         </div>
     </dialog>
 
+    <!-- NATIVE MODAL: GANTI PASSWORD -->
+    <dialog id="change-password-modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Ganti Password</h3>
+            <button class="modal-close" id="cancel-change-pwd-btn">&times;</button>
+        </div>
+        <form id="change-password-form">
+            <div class="form-group">
+                <label for="old_password" class="form-label">Password Lama</label>
+                <input type="password" id="old_password" class="form-input" placeholder="Masukkan password lama" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="new_password" class="form-label">Password Baru</label>
+                <input type="password" id="new_password" class="form-input" placeholder="Masukkan password baru" required>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label for="confirm_new_password" class="form-label">Konfirmasi Password Baru</label>
+                <input type="password" id="confirm_new_password" class="form-input" placeholder="Konfirmasi password baru" required>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Simpan Password</button>
+            </div>
+        </form>
+    </dialog>
+
     <script>
         const USER_ROLE = "{{ role }}";
         const USER_NAME = "{{ username }}";
     </script>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=1.1"></script>
 </body>
 </html>

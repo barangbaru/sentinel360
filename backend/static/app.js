@@ -4,6 +4,60 @@ document.addEventListener("DOMContentLoaded", () => {
     const serverGrid = document.getElementById("servers-container");
     const isDetailPage = document.getElementById("server-detail-container");
 
+    // Global Change Password Handler
+    const changePwdBtn = document.getElementById("change-pwd-btn");
+    const changePwdModal = document.getElementById("change-password-modal");
+    const cancelChangePwdBtn = document.getElementById("cancel-change-pwd-btn");
+    const changePwdForm = document.getElementById("change-password-form");
+
+    if (changePwdBtn && changePwdModal) {
+        changePwdBtn.addEventListener("click", () => {
+            changePwdForm.reset();
+            changePwdModal.showModal();
+        });
+    }
+
+    if (cancelChangePwdBtn && changePwdModal) {
+        cancelChangePwdBtn.addEventListener("click", () => {
+            changePwdModal.close();
+        });
+    }
+
+    if (changePwdForm && changePwdModal) {
+        changePwdForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const oldPassword = document.getElementById("old_password").value;
+            const newPassword = document.getElementById("new_password").value;
+            const confirmNewPassword = document.getElementById("confirm_new_password").value;
+
+            if (newPassword !== confirmNewPassword) {
+                alert("Password baru dan konfirmasi password tidak cocok!");
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/user/change-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Gagal mengubah password.");
+                }
+
+                alert("Password berhasil diubah!");
+                changePwdModal.close();
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
+    }
+
     if (serverGrid) {
         initDashboard();
     } else if (isDetailPage) {
@@ -62,13 +116,38 @@ function initDashboard() {
 
     // Fetch and Render Servers
     async function loadServers() {
+        const container = document.getElementById("servers-container");
         try {
             const res = await fetch("/api/servers");
             if (res.status === 401) {
                 window.location.href = "/login";
                 return;
             }
-            if (!res.ok) throw new Error("Failed to fetch servers");
+            if (res.status === 403) {
+                if (container) {
+                    container.innerHTML = `
+                        <div class="card" style="grid-column: 1/-1; text-align: center; padding: 3rem; border-color: rgba(239, 68, 68, 0.2);">
+                            <div style="font-size: 2.5rem; margin-bottom: 1rem;">🔒</div>
+                            <h3 style="margin-bottom: 0.5rem; color: #f87171;">Akses Ditolak</h3>
+                            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Anda tidak memiliki akses untuk melihat data server.</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+            if (!res.ok) {
+                if (container) {
+                    container.innerHTML = `
+                        <div class="card" style="grid-column: 1/-1; text-align: center; padding: 3rem; border-color: rgba(239, 68, 68, 0.2);">
+                            <div style="font-size: 2.5rem; margin-bottom: 1rem;">⚠️</div>
+                            <h3 style="margin-bottom: 0.5rem; color: #f87171;">Gagal Memuat Data</h3>
+                            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Terjadi kesalahan saat memuat server (${res.status}).</p>
+                            <button class="btn btn-secondary" onclick="loadServers()">Coba Lagi</button>
+                        </div>
+                    `;
+                }
+                throw new Error("Failed to fetch servers: " + res.status);
+            }
             const servers = await res.json();
             renderServers(servers);
         } catch (error) {
