@@ -107,16 +107,9 @@ Agar agent terus berjalan secara otomatis setelah booting, Anda bisa membuat sys
 Cukup unduh dan jalankan script installer otomatis di PowerShell (sebagai Administrator) untuk menginstal dependensi, membuat konfigurasi, dan mendaftarkan agent secara otomatis di Windows Task Scheduler (berjalan di background saat Windows startup):
 
 1. Buka PowerShell sebagai **Administrator**.
-2. Jalankan perintah berikut untuk mengunduh dan menjalankan installer:
+2. Jalankan perintah berikut untuk mengunduh dan menjalankan installer (dalam satu baris perintah):
    ```powershell
-   # Izinkan eksekusi script lokal sementara jika diblokir
-   Set-ExecutionPolicy Bypass -Scope Process -Force
-
-   # Unduh script installer
-   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/barangbaru/sentinel360/main/agent/install-agent.ps1" -OutFile "$env:TEMP\install-agent.ps1" -UseBasicParsing
-
-   # Jalankan installer
-   & "$env:TEMP\install-agent.ps1"
+   Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri "https://raw.githubusercontent.com/barangbaru/sentinel360/main/agent/install-agent.ps1" -OutFile "$env:TEMP\install-agent.ps1" -UseBasicParsing; & "$env:TEMP\install-agent.ps1"
    ```
 3. Ikuti prompt interaktif untuk memasukkan URL Sentinel360 Server pusat dan API Key perangkat Anda.
 
