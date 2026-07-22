@@ -273,6 +273,8 @@ if [ "$DB_TYPE" = "postgresql" ]; then
     fi
 fi
 
+# Bersihkan modul-modul lama untuk menghindari konflik namespace
+venv/bin/pip uninstall -y pysnmp-lextudio pysnmp pyasn1 || true
 venv/bin/pip install -r requirements.txt -q
 success "Dependencies up to date."
 
