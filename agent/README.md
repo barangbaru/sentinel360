@@ -100,8 +100,31 @@ Agar agent terus berjalan secara otomatis setelah booting, Anda bisa membuat sys
    sudo systemctl status sentinel-agent.service
    ```
 
-### 2. Di Windows (NSSM - Non-Sucking Service Manager)
-Untuk Windows, Anda bisa menggunakan utility gratis **NSSM** untuk memasang python script sebagai service:
+### 2. Di Windows (NSSM / PowerShell Automated Installer)
+
+#### Metode A: Menggunakan Installer Otomatis PowerShell (Rekomendasi)
+
+Cukup unduh dan jalankan script installer otomatis di PowerShell (sebagai Administrator) untuk menginstal dependensi, membuat konfigurasi, dan mendaftarkan agent secara otomatis di Windows Task Scheduler (berjalan di background saat Windows startup):
+
+1. Buka PowerShell sebagai **Administrator**.
+2. Jalankan perintah berikut untuk mengunduh dan menjalankan installer:
+   ```powershell
+   # Izinkan eksekusi script lokal sementara jika diblokir
+   Set-ExecutionPolicy Bypass -Scope Process -Force
+
+   # Unduh script installer
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/barangbaru/sentinel360/main/agent/install-agent.ps1" -OutFile "$env:TEMP\install-agent.ps1" -UseBasicParsing
+
+   # Jalankan installer
+   & "$env:TEMP\install-agent.ps1"
+   ```
+3. Ikuti prompt interaktif untuk memasukkan URL Sentinel360 Server pusat dan API Key perangkat Anda.
+
+---
+
+#### Metode B: Menggunakan NSSM (Manual)
+
+Untuk mendaftarkan agent secara manual menggunakan utility pihak ketiga gratis **NSSM**:
 
 1. Unduh NSSM dari [nssm.cc](https://nssm.cc/).
 2. Buka Command Prompt Administrator dan jalankan:
@@ -113,3 +136,4 @@ Untuk Windows, Anda bisa menggunakan utility gratis **NSSM** untuk memasang pyth
    - **Startup directory**: Direktori tempat file `agent.py` berada.
    - **Arguments**: Path file `agent.py` (contoh: `C:\SentinelAgent\agent.py`).
 4. Klik **Install service** dan jalankan service-nya melalui `services.msc` atau `net start SentinelAgent`.
+
