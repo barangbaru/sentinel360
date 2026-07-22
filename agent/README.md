@@ -10,13 +10,23 @@ Sentinel360 Agent adalah program ringan berbasis Python yang berjalan di server 
 
 ---
 
-## Cara Instalasi & Penggunaan
+### Cara Cepat (Automated Installer untuk Linux/Ubuntu):
 
-### Prasyarat
-- **Python 3.7+** terinstal di server target.
-- Dependensi: `psutil` dan `requests`.
+Cukup unduh dan jalankan script installer otomatis di server target Anda untuk mengunduh, mengonfigurasi, dan memasang agent sebagai background service (Systemd) secara otomatis:
 
-### Langkah-langkah Menjalankan Agent:
+```bash
+# Unduh script installer
+curl -sS -O https://raw.githubusercontent.com/barangbaru/sentinel360/main/agent/install-agent.sh
+
+# Jalankan installer dengan hak akses root
+sudo bash install-agent.sh
+```
+
+Script akan menampilkan prompt interaktif untuk memasukkan host URL Sentinel360 pusat dan API Key server yang didapat dari web dashboard.
+
+---
+
+### Cara Manual:
 
 1. **Unduh/Salin Berkas**:
    Salin file `agent.py` ke direktori kerja di server target Anda.
