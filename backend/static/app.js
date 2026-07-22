@@ -623,7 +623,6 @@ function initDetailPage() {
     }
 
     // Delete Server Trigger
-    const deleteBtn = document.getElementById("delete-server-btn");
     if (deleteBtn) {
         deleteBtn.addEventListener("click", async () => {
             if (confirm("Apakah Anda yakin ingin menghapus server ini dari Sentinel360? Semua data history performa akan dihapus permanen.")) {
