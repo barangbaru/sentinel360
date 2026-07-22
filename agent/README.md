@@ -130,3 +130,24 @@ Untuk mendaftarkan agent secara manual menggunakan utility pihak ketiga gratis *
    - **Arguments**: Path file `agent.py` (contoh: `C:\SentinelAgent\agent.py`).
 4. Klik **Install service** dan jalankan service-nya melalui `services.msc` atau `net start SentinelAgent`.
 
+---
+
+#### Metode C: Menggunakan Standalone Executable (Rekomendasi Tanpa Install Python)
+
+Jika PC/Server Windows Anda tidak memiliki Python dan Anda ingin proses yang paling instan:
+
+1. Unduh berkas binary siap pakai: **[Sentinel360Agent.exe](https://github.com/barangbaru/sentinel360/raw/main/agent/Sentinel360Agent.exe)**.
+2. Tempatkan berkas `Sentinel360Agent.exe` ke dalam folder kerja Anda (misalnya `C:\SentinelAgent`).
+3. Buat berkas konfigurasi bernama `agent_config.json` di dalam folder yang sama dengan isi berikut (sesuaikan nilainya):
+   ```json
+   {
+       "server_url": "http://<IP_SENTINEL360_SERVER>:8000",
+       "api_key": "<API_KEY_SERVER_ANDA>",
+       "interval_seconds": 15
+   }
+   ```
+4. Buka Command Prompt / Run (tekan `Win + R`) dan jalankan untuk memunculkan indikator baterai di taskbar:
+   ```cmd
+   C:\SentinelAgent\Sentinel360Agent.exe --tray
+   ```
+5. Agar berjalan otomatis saat Windows startup, buat shortcut file tersebut dengan argumen `--tray` ke dalam folder startup Windows (`shell:startup`).
