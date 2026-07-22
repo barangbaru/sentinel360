@@ -37,7 +37,7 @@ if ([string]::IsNullOrWhiteSpace($intervalInput)) { $intervalInput = $defaultInt
 $interval = [int]$intervalInput
 
 # 3. Cek Python
-Write-Host "`n[1/5] Memeriksa instalasi Python..." -ForegroundColor Cyan
+Write-Host ""; Write-Host "[1/5] Memeriksa instalasi Python..." -ForegroundColor Cyan
 $pythonPath = Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
 if (-not $pythonPath) {
     Write-Host "Python tidak ditemukan di PATH. Mencoba menginstal Python menggunakan winget..." -ForegroundColor Yellow
@@ -61,7 +61,7 @@ $pythonwPath = $pythonPath -replace 'python.exe$', 'pythonw.exe'
 Write-Host "Menggunakan Python: $pythonPath" -ForegroundColor Green
 
 # 4. Siapkan Direktori & Unduh berkas
-Write-Host "`n[2/5] Menyiapkan direktori & mengunduh agent..." -ForegroundColor Cyan
+Write-Host ""; Write-Host "[2/5] Menyiapkan direktori & mengunduh agent..." -ForegroundColor Cyan
 $installDir = "C:\SentinelAgent"
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
@@ -86,7 +86,7 @@ try {
 }
 
 # 5. Buat konfigurasi agent_config.json
-Write-Host "`n[3/5] Membuat file konfigurasi..." -ForegroundColor Cyan
+Write-Host ""; Write-Host "[3/5] Membuat file konfigurasi..." -ForegroundColor Cyan
 $config = @{
     server_url = $hostUrl
     api_key = $apiKey
@@ -97,13 +97,13 @@ Set-Content -Path "$installDir\agent_config.json" -Value $configJson
 Write-Host "Konfigurasi disimpan di $installDir\agent_config.json" -ForegroundColor Green
 
 # 6. Install dependensi python
-Write-Host "`n[4/5] Menginstal dependensi python (psutil, requests)..." -ForegroundColor Cyan
+Write-Host ""; Write-Host "[4/5] Menginstal dependensi python (psutil, requests)..." -ForegroundColor Cyan
 Start-Process $pythonPath -ArgumentList "-m pip install --upgrade pip --quiet" -NoNewWindow -Wait
 Start-Process $pythonPath -ArgumentList "-m pip install psutil requests --quiet" -NoNewWindow -Wait
 Write-Host "Dependensi terpasang." -ForegroundColor Green
 
 # 7. Daftarkan sebagai Task Scheduler (berjalan di background)
-Write-Host "`n[5/5] Mendaftarkan Agent ke Task Scheduler Windows..." -ForegroundColor Cyan
+Write-Host ""; Write-Host "[5/5] Mendaftarkan Agent ke Task Scheduler Windows..." -ForegroundColor Cyan
 $taskName = "Sentinel360Agent"
 
 # Hapus task lama jika ada
