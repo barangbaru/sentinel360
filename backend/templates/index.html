@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel360 | Server Monitoring Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%22100%%22 height=%22100%%22><rect width=%22100%%22 height=%22100%%22 fill=%22%236366f1%22 rx=%228%22/><text x=%2250%%22 y=%2250%%22 font-family=%22sans-serif%22 font-weight=%22bold%22 font-size=%2216%22 fill=%22white%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>S360</text></svg>">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">S</div>
+            <span class="logo-text">Sentinel360</span>
+            <span class="logo-badge">V1.0</span>
+        </div>
+        <button id="add-server-btn" class="btn btn-primary">
+            <span>+</span> Tambah Server
+        </button>
+    </header>
+
+    <div class="app-container">
+        <div class="dashboard-grid">
+            <!-- Left Side: Servers Grid -->
+            <div>
+                <div class="section-header">
+                    <h2 class="section-title">🖥️ Server & Perangkat yang Dimonitor</h2>
+                </div>
+                <div id="servers-container" class="server-grid">
+                    <!-- Loaded dynamically via app.js -->
+                    <div style="grid-column: 1/-1; text-align: center; padding: 4rem;">
+                        <p style="color: var(--text-secondary)">Memuat data server...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Alerts Sidebar -->
+            <div>
+                <div class="section-header">
+                    <h2 class="section-title">🚨 Alarm Aktif</h2>
+                </div>
+                <div class="sidebar-panel">
+                    <div id="alerts-container" class="alert-list">
+                        <!-- Loaded dynamically via app.js -->
+                        <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
+                            Memuat alarm...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NATIVE MODAL: TAMBAH SERVER -->
+    <dialog id="add-server-modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Tambah Server / Perangkat Baru</h3>
+            <button class="modal-close" id="cancel-modal-btn">&times;</button>
+        </div>
+        <form id="add-server-form">
+            <div class="form-group">
+                <label for="name" class="form-label">Nama Server / Label</label>
+                <input type="text" id="name" class="form-input" placeholder="contoh: Web Server Linux Utama" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="ip_address" class="form-label">IP Address / Hostname</label>
+                <input type="text" id="ip_address" class="form-input" placeholder="contoh: 192.168.1.100" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="monitor_type" class="form-label">Metode Monitoring</label>
+                <select id="monitor_type" class="form-select">
+                    <option value="ping">Ping Jaringan (ICMP - Agentless)</option>
+                    <option value="agent">Agent Client (Rekomendasi - Performa Lengkap)</option>
+                    <option value="snmp">SNMP Poller (SNMP v2c - Agentless)</option>
+                </select>
+            </div>
+
+            <!-- SNMP CONFIG FIELDS (Toggled in app.js) -->
+            <div id="snmp-config-fields" style="display: none; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
+                <h4 style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--accent);">Konfigurasi SNMP</h4>
+                <div class="form-group">
+                    <label for="snmp_community" class="form-label">SNMP Community</label>
+                    <input type="text" id="snmp_community" class="form-input" value="public">
+                </div>
+                <div class="form-group">
+                    <label for="snmp_port" class="form-label">SNMP Port</label>
+                    <input type="number" id="snmp_port" class="form-input" value="161">
+                </div>
+                <div class="form-group">
+                    <label for="snmp_version" class="form-label">SNMP Version</label>
+                    <select id="snmp_version" class="form-select">
+                        <option value="2c">v2c</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Simpan Perangkat</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- NATIVE MODAL: DISPLAY API KEY FOR AGENT -->
+    <dialog id="api-key-modal">
+        <div class="modal-header">
+            <h3 class="modal-title" style="color: var(--online)">✓ Server Berhasil Didaftarkan</h3>
+        </div>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            Karena Anda memilih metode **Agent Client**, Anda harus memasukkan **API Key** berikut pada file konfigurasi agent target (`agent_config.json`):
+        </p>
+        
+        <div class="api-key-display">
+            <div class="api-key-title">AGENT API KEY</div>
+            <div class="api-key-value-container">
+                <span id="api-key-val" class="api-key-value">API_KEY_UNKNOWN</span>
+                <button id="copy-key-btn" class="copy-btn">Copy</button>
+            </div>
+        </div>
+
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 1rem;">
+            *Catatan: API Key ini tidak akan ditampilkan lagi demi keamanan. Pastikan Anda menyalinnya.*
+        </p>
+
+        <div class="modal-actions" style="margin-top: 1.5rem;">
+            <button id="close-api-key-modal" class="btn btn-primary">Tutup</button>
+        </div>
+    </dialog>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

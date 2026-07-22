@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel360 | Server Detail</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%22100%%22 height=%22100%%22><rect width=%22100%%22 height=%22100%%22 fill=%22%236366f1%22 rx=%228%22/><text x=%2250%%22 y=%2250%%22 font-family=%22sans-serif%22 font-weight=%22bold%22 font-size=%2216%22 fill=%22white%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>S360</text></svg>">
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">S</div>
+            <a href="/" class="logo-text" style="text-decoration: none;">Sentinel360</a>
+            <span class="logo-badge">V1.0</span>
+        </div>
+        <button id="delete-server-btn" class="btn btn-danger">Hapus Server</button>
+    </header>
+
+    <div class="app-container" id="server-detail-container">
+        <!-- Back Button -->
+        <a href="/" class="back-link">← Kembali ke Dashboard</a>
+
+        <!-- Server Basic Info Card -->
+        <div class="server-detail-header-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h1 id="detail-name" style="font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem;">Server Name</h1>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span id="detail-ip" style="color: var(--text-secondary); font-family: monospace; font-size: 1rem;">192.168.1.1</span>
+                        <span id="detail-type" class="monitor-type-badge">AGENT</span>
+                    </div>
+                </div>
+                <span id="detail-status" class="status-badge status-unknown">
+                    <span class="dot"></span> unknown
+                </span>
+            </div>
+
+            <div class="detail-header-grid">
+                <div class="detail-header-item">
+                    <span class="detail-header-label">Sistem Operasi</span>
+                    <span id="detail-os" class="detail-header-value">Loading...</span>
+                </div>
+                <div class="detail-header-item">
+                    <span class="detail-header-label">Uptime</span>
+                    <span id="detail-uptime" class="detail-header-value">Loading...</span>
+                </div>
+                <div class="detail-header-item">
+                    <span class="detail-header-label">Terakhir Dilihat</span>
+                    <span id="detail-seen" class="detail-header-value">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Agent API Key display if applicable -->
+            <div id="agent-token-section" style="display: none; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <span class="detail-header-label" style="display: block; margin-bottom: 0.25rem;">API Key untuk Agent</span>
+                        <span id="agent-key-display-val" style="font-family: monospace; color: var(--text-primary); font-size: 0.9rem; background: rgba(0,0,0,0.2); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-color);">key</span>
+                    </div>
+                    <button id="copy-detail-key-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Salin API Key</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter & Actions Panel -->
+        <div class="section-header">
+            <h2 class="section-title">📊 Grafik Performa Historis</h2>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <label for="range-select" style="font-size: 0.85rem; color: var(--text-secondary);">Rentang Waktu:</label>
+                <select id="range-select" class="form-select" style="width: auto; padding: 0.4rem 2rem 0.4rem 0.8rem;">
+                    <option value="1">1 Jam Terakhir</option>
+                    <option value="6">6 Jam Terakhir</option>
+                    <option value="12" selected>12 Jam Terakhir</option>
+                    <option value="24">24 Jam Terakhir</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+            <div class="card chart-card">
+                <h3 style="font-family: var(--font-display); font-size: 1rem; margin-bottom: 1rem;">Penggunaan CPU (%)</h3>
+                <div class="chart-container">
+                    <canvas id="cpu-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-card">
+                <h3 style="font-family: var(--font-display); font-size: 1rem; margin-bottom: 1rem;">Penggunaan RAM (%)</h3>
+                <div class="chart-container">
+                    <canvas id="ram-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-card">
+                <h3 style="font-family: var(--font-display); font-size: 1rem; margin-bottom: 1rem;">Penggunaan Disk (%)</h3>
+                <div class="chart-container">
+                    <canvas id="disk-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-card">
+                <h3 id="net-chart-title" style="font-family: var(--font-display); font-size: 1rem; margin-bottom: 1rem;">Network Speed / Latency</h3>
+                <div class="chart-container">
+                    <canvas id="net-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pass serverId parameter to Javascript -->
+    <script>
+        window.serverId = {{ server_id }};
+    </script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
