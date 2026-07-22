@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
 function initDashboard() {
     // DOM Elements
     const addServerBtn = document.getElementById("add-server-btn");
+    if (addServerBtn && typeof USER_ROLE !== "undefined" && USER_ROLE === "view") {
+        addServerBtn.style.display = "none";
+    }
     const addModal = document.getElementById("add-server-modal");
     const addForm = document.getElementById("add-server-form");
     const monitorTypeSelect = document.getElementById("monitor_type");
@@ -61,6 +64,10 @@ function initDashboard() {
     async function loadServers() {
         try {
             const res = await fetch("/api/servers");
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
             if (!res.ok) throw new Error("Failed to fetch servers");
             const servers = await res.json();
             renderServers(servers);
@@ -72,12 +79,13 @@ function initDashboard() {
     function renderServers(servers) {
         const container = document.getElementById("servers-container");
         if (servers.length === 0) {
+            const hideBtn = (typeof USER_ROLE !== "undefined" && USER_ROLE === "view") ? "display: none;" : "";
             container.innerHTML = `
                 <div class="card" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
                     <div style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.4;">🖥️</div>
                     <h3 style="margin-bottom: 0.5rem;">Belum Ada Server</h3>
                     <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Daftarkan server atau perangkat Anda untuk mulai memantau.</p>
-                    <button class="btn btn-primary" onclick="document.getElementById('add-server-modal').showModal()">Tambah Server</button>
+                    <button class="btn btn-primary" style="${hideBtn}" onclick="document.getElementById('add-server-modal').showModal()">Tambah Server</button>
                 </div>
             `;
             return;
@@ -244,6 +252,10 @@ function initDashboard() {
     async function loadAlerts() {
         try {
             const res = await fetch("/api/alerts?resolved=false");
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
             if (!res.ok) throw new Error("Failed to fetch alerts");
             const alerts = await res.json();
             renderAlerts(alerts);
@@ -262,13 +274,14 @@ function initDashboard() {
             return;
         }
 
+        const hideResolveBtn = (typeof USER_ROLE !== "undefined" && USER_ROLE === "view") ? "display: none;" : "";
         alertsContainer.innerHTML = alerts.map(alert => {
             const timeStr = new Date(alert.timestamp).toLocaleTimeString();
             return `
                 <div class="alert-item">
                     <span class="alert-msg">${alert.message}</span>
                     <span class="alert-time">⚠️ Aktif pada: ${timeStr}</span>
-                    <button class="btn btn-secondary" style="align-self: flex-end; padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.2);" onclick="resolveAlert(${alert.id})">
+                    <button class="btn btn-secondary" style="align-self: flex-end; padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.2); ${hideResolveBtn}" onclick="resolveAlert(${alert.id})">
                         Selesaikan
                     </button>
                 </div>
@@ -309,10 +322,19 @@ function initDetailPage() {
     let metricsChartCpu, metricsChartRam, metricsChartDisk, metricsChartNet;
     let detailPollInterval;
 
+    const deleteBtn = document.getElementById("delete-server-btn");
+    if (deleteBtn && typeof USER_ROLE !== "undefined" && USER_ROLE === "view") {
+        deleteBtn.style.display = "none";
+    }
+
     async function loadServerDetails() {
         try {
             // Load Server Basic info
             const sRes = await fetch(`/api/servers/${serverId}`);
+            if (sRes.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
             if (!sRes.ok) throw new Error("Server not found");
             const server = await sRes.json();
             
@@ -363,6 +385,10 @@ function initDetailPage() {
         const selectHours = document.getElementById("range-select")?.value || 12;
         try {
             const res = await fetch(`/api/servers/${serverId}/metrics?hours=${selectHours}`);
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
             if (!res.ok) throw new Error("Failed to fetch metrics");
             const metrics = await res.json();
             

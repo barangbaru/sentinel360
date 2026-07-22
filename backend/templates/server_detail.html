@@ -16,7 +16,19 @@
             <a href="/" class="logo-text" style="text-decoration: none;">Sentinel360</a>
             <span class="logo-badge">V1.0</span>
         </div>
-        <button id="delete-server-btn" class="btn btn-danger">Hapus Server</button>
+        <div style="display: flex; align-items: center; gap: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);">User:</span>
+                <strong style="color: var(--text-primary)">{{ username }}</strong>
+                <span class="monitor-type-badge" style="background: rgba(99, 102, 241, 0.15); border-color: var(--accent); color: var(--text-primary); font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 4px;">{{ role }}</span>
+            </div>
+            
+            <button id="delete-server-btn" class="btn btn-danger">Hapus Server</button>
+            
+            <a href="/logout" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; text-decoration: none;">
+                Keluar
+            </a>
+        </div>
     </header>
 
     <div class="app-container" id="server-detail-container">
@@ -111,9 +123,11 @@
         </div>
     </div>
 
-    <!-- Pass serverId parameter to Javascript -->
+    <!-- Pass parameters to Javascript -->
     <script>
         window.serverId = {{ server_id }};
+        const USER_ROLE = "{{ role }}";
+        const USER_NAME = "{{ username }}";
     </script>
     <script src="/static/app.js"></script>
 </body>

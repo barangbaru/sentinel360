@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel360 | Login</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%22100%%22 height=%22100%%22><rect width=%22100%%22 height=%22100%%22 fill=%22%236366f1%22 rx=%228%22/><text x=%2250%%22 y=%2250%%22 font-family=%22sans-serif%22 font-weight=%22bold%22 font-size=%2216%22 fill=%22white%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>S360</text></svg>">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .login-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            padding: 2.5rem;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .login-card::before {
+            height: 5px;
+            background: var(--accent-gradient);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .login-logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 3.5rem;
+            height: 3.5rem;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            font-size: 1.8rem;
+            font-weight: 800;
+            font-family: var(--font-display);
+            color: white;
+            box-shadow: 0 0 25px rgba(99, 102, 241, 0.4);
+            margin-bottom: 1rem;
+        }
+        
+        .login-title {
+            font-family: var(--font-display);
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #ffffff, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .login-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #f87171;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .login-footer {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+        }
+
+        .credential-tip {
+            margin-top: 1.5rem;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .credential-tip strong {
+            color: var(--text-primary);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="card login-card">
+            <div class="login-header">
+                <div class="login-logo">S</div>
+                <h1 class="login-title">Sentinel360</h1>
+                <p class="login-subtitle">Masukkan akun Anda untuk mengakses sistem</p>
+            </div>
+            
+            {% if error %}
+            <div class="alert-error">
+                <span>⚠️</span> {{ error }}
+            </div>
+            {% endif %}
+            
+            <form action="/login" method="POST">
+                <div class="form-group">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" id="username" name="username" class="form-input" placeholder="Masukkan username" required autofocus>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-input" placeholder="Masukkan password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem 1.2rem; font-size: 1rem;">
+                    Masuk ke Sistem
+                </button>
+            </form>
+            
+            <div class="credential-tip">
+                <span style="color: var(--accent); font-weight: 600;">Petunjuk Login:</span><br>
+                • Admin: <strong>admin</strong> / <strong>admin123</strong><br>
+                • Viewer: <strong>viewer</strong> / <strong>viewer123</strong>
+            </div>
+
+            <div class="login-footer">
+                Sentinel360 Server Monitoring
+            </div>
+        </div>
+    </div>
+</body>
+</html>

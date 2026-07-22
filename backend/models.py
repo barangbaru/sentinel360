@@ -58,6 +58,13 @@ class Alert(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     message = Column(String, nullable=False)
     resolved = Column(Boolean, default=False)
-    resolved_at = Column(DateTime, nullable=True)
-
     server = relationship("Server", back_populates="alerts")
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, default="view", nullable=False)  # "admin" or "view"
+    is_active = Column(Boolean, default=True, nullable=False)
