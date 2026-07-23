@@ -293,6 +293,15 @@
             return new Date(dateStr);
         }
 
+        function formatIP(ip) {
+            if (!ip) return "";
+            const parts = ip.split(".");
+            if (parts.length >= 2) {
+                return parts.slice(-2).join(".");
+            }
+            return ip;
+        }
+
         let cachedTvServers = [];
         let cachedTvWebsites = [];
 
@@ -555,7 +564,7 @@
                             <div class="tv-card-header">
                                 <div>
                                     <div class="tv-server-name" title="${server.name}">${server.name}</div>
-                                    <div class="tv-server-ip">${server.ip_address}</div>
+                                    <div class="tv-server-ip">${formatIP(server.ip_address)}</div>
                                 </div>
                                 <span class="tv-status-dot"></span>
                             </div>
