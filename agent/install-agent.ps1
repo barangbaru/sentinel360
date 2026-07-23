@@ -57,15 +57,26 @@ $targetExe = Join-Path $installDir "Sentinel360Agent.exe"
 
 if (Test-Path $sourceExe) {
     Copy-Item $sourceExe $targetExe -Force
+    Unblock-File -Path $targetExe -ErrorAction SilentlyContinue
     Write-Host "Berhasil menyalin $exeName ke $targetExe" -ForegroundColor Green
 } else {
     Write-Host "$exeName tidak ditemukan secara lokal. Mencoba mengunduh dari GitHub..." -ForegroundColor Yellow
     $rawAgentUrl = "https://raw.githubusercontent.com/barangbaru/sentinel360/main/agent/$exeName"
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $rawAgentUrl -OutFile $targetExe -UseBasicParsing
+        Invoke-WebRequest -Uri $rawAgentUrl -OutFile $targetExe -UseBasicParsing -ErrorAction Stop
+        
+        # Verify download integrity (file size must be greater than 5MB)
+        $fileInfo = Get-Item $targetExe
+        if ($fileInfo.Length -lt 5MB) {
+            Remove-Item $targetExe -ErrorAction SilentlyContinue
+            throw "File binary yang diunduh terlalu kecil ($($fileInfo.Length) bytes). Kemungkinan URL raw GitHub mengembalikan error 404 atau repository bersifat private."
+        }
+        
+        Unblock-File -Path $targetExe -ErrorAction SilentlyContinue
         Write-Host "Berhasil mengunduh $exeName dari GitHub." -ForegroundColor Green
     } catch {
+        Write-Error "Gagal mengunduh binary: $_"
         Write-Error "File executable agent tidak ditemukan secara lokal maupun di GitHub repo! Proses instalasi dibatalkan."
         Read-Host "Tekan Enter untuk keluar..."
         Exit 1
