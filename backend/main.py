@@ -56,6 +56,15 @@ try:
         db.execute(text("ALTER TABLE alerts ADD COLUMN resolved_at DATETIME"))
         print("Migration: Added resolved_at column to alerts table.")
         
+    res_settings = db.execute(text("PRAGMA table_info(system_settings)")).fetchall()
+    settings_cols = [row[1] for row in res_settings]
+    if "whatsapp_session_id" not in settings_cols:
+        db.execute(text("ALTER TABLE system_settings ADD COLUMN whatsapp_session_id VARCHAR"))
+        print("Migration: Added whatsapp_session_id column to system_settings.")
+    if "whatsapp_recipients" not in settings_cols:
+        db.execute(text("ALTER TABLE system_settings ADD COLUMN whatsapp_recipients VARCHAR"))
+        print("Migration: Added whatsapp_recipients column to system_settings.")
+
     # Seed default system settings
     settings = db.query(SystemSettings).first()
     if not settings:

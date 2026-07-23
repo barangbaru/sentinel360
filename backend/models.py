@@ -112,3 +112,5 @@ class SystemSettings(Base):
     whatsapp_enabled = Column(Boolean, default=False)
     whatsapp_webhook_url = Column(String, nullable=True)
     whatsapp_token = Column(String, nullable=True)
+    whatsapp_session_id = Column(String, nullable=True)
+    whatsapp_recipients = Column(String, nullable=True)

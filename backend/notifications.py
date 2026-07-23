@@ -38,19 +38,48 @@ def send_alert_notification(db: Session, message: str):
     # 2. WhatsApp Webhook Notification
     if settings.whatsapp_enabled and settings.whatsapp_webhook_url:
         try:
-            headers = {}
+            import urllib.parse
+            headers = {"Content-Type": "application/json"}
             if settings.whatsapp_token:
                 headers["Authorization"] = f"Bearer {settings.whatsapp_token}"
             
-            payload = {
-                "message": f"⚠️ Sentinel360 ALERT: {message}",
-                "timestamp": str(datetime.utcnow())
-            }
-            res = requests.post(settings.whatsapp_webhook_url, json=payload, headers=headers, timeout=5)
-            if res.ok:
-                logger.info("WhatsApp notification sent successfully.")
-            else:
-                logger.error(f"Failed to send WhatsApp notification: {res.text}")
+            # Format base URL for Open WA if session id is specified
+            url = settings.whatsapp_webhook_url
+            if settings.whatsapp_session_id:
+                parsed_url = urllib.parse.urlparse(url)
+                if not parsed_url.path or parsed_url.path == "/":
+                    url = f"{url.rstrip('/')}/api/{settings.whatsapp_session_id}/sendText"
+            
+            # Process multiple recipient phone numbers
+            recipients = []
+            if settings.whatsapp_recipients:
+                recipients = [r.strip() for r in settings.whatsapp_recipients.split(",") if r.strip()]
+            
+            if not recipients:
+                logger.warning("WhatsApp is enabled but no recipients are configured.")
+            
+            for rc in recipients:
+                rc_formatted = rc
+                if not rc_formatted.endswith("@c.us") and not rc_formatted.endswith("@g.us"):
+                    rc_formatted = f"{rc}@c.us"
+                
+                payload = {
+                    "to": rc_formatted,
+                    "chatId": rc_formatted,
+                    "phone": rc,
+                    "message": f"⚠️ Sentinel360 ALERT: {message}",
+                    "content": f"⚠️ Sentinel360 ALERT: {message}",
+                    "text": f"⚠️ Sentinel360 ALERT: {message}",
+                    "session": settings.whatsapp_session_id,
+                    "sessionId": settings.whatsapp_session_id,
+                    "session_id": settings.whatsapp_session_id
+                }
+                
+                res = requests.post(url, json=payload, headers=headers, timeout=5)
+                if res.ok:
+                    logger.info(f"WhatsApp notification sent successfully to {rc}.")
+                else:
+                    logger.error(f"Failed to send WhatsApp notification to {rc}: {res.text}")
         except Exception as e:
             logger.error(f"Error sending WhatsApp notification: {e}")
 

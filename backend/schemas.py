@@ -137,6 +137,8 @@ class SystemSettingsBase(BaseModel):
     whatsapp_enabled: bool = False
     whatsapp_webhook_url: Optional[str] = None
     whatsapp_token: Optional[str] = None
+    whatsapp_session_id: Optional[str] = None
+    whatsapp_recipients: Optional[str] = None
 
 class SystemSettingsResponse(SystemSettingsBase):
     id: int

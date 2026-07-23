@@ -524,6 +524,8 @@ function initDashboard() {
                 document.getElementById("whatsapp_enabled").checked = settings.whatsapp_enabled;
                 document.getElementById("whatsapp_webhook_url").value = settings.whatsapp_webhook_url || "";
                 document.getElementById("whatsapp_token").value = settings.whatsapp_token || "";
+                document.getElementById("whatsapp_session_id").value = settings.whatsapp_session_id || "";
+                document.getElementById("whatsapp_recipients").value = settings.whatsapp_recipients || "";
                 
                 document.getElementById("smtp_enabled").checked = settings.smtp_enabled;
                 document.getElementById("smtp_host").value = settings.smtp_host || "";
@@ -558,6 +560,8 @@ function initDashboard() {
                 whatsapp_enabled: document.getElementById("whatsapp_enabled").checked,
                 whatsapp_webhook_url: document.getElementById("whatsapp_webhook_url").value || null,
                 whatsapp_token: document.getElementById("whatsapp_token").value || null,
+                whatsapp_session_id: document.getElementById("whatsapp_session_id").value || null,
+                whatsapp_recipients: document.getElementById("whatsapp_recipients").value || null,
                 
                 smtp_enabled: document.getElementById("smtp_enabled").checked,
                 smtp_host: document.getElementById("smtp_host").value || null,
@@ -598,6 +602,8 @@ function initDashboard() {
                     whatsapp_enabled: document.getElementById("whatsapp_enabled").checked,
                     whatsapp_webhook_url: document.getElementById("whatsapp_webhook_url").value || null,
                     whatsapp_token: document.getElementById("whatsapp_token").value || null,
+                    whatsapp_session_id: document.getElementById("whatsapp_session_id").value || null,
+                    whatsapp_recipients: document.getElementById("whatsapp_recipients").value || null,
                     
                     smtp_enabled: document.getElementById("smtp_enabled").checked,
                     smtp_host: document.getElementById("smtp_host").value || null,
