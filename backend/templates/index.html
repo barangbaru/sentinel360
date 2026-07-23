@@ -43,6 +43,21 @@
         <div class="dashboard-grid">
             <!-- Left Side: Servers Grid -->
             <div>
+                <!-- Website Monitoring Section -->
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="section-title">🌐 URL & Website yang Dimonitor</h2>
+                    <button id="add-website-btn" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+                        <span>+</span> Tambah Website
+                    </button>
+                </div>
+                <div id="websites-container" class="server-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 2rem;">
+                    <!-- Loaded dynamically via app.js -->
+                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                        <p style="color: var(--text-secondary)">Memuat data website...</p>
+                    </div>
+                </div>
+
+                <!-- Server Monitoring Section -->
                 <div class="section-header">
                     <h2 class="section-title">🖥️ Server & Perangkat yang Dimonitor</h2>
                 </div>
@@ -50,20 +65,6 @@
                     <!-- Loaded dynamically via app.js -->
                     <div style="grid-column: 1/-1; text-align: center; padding: 4rem;">
                         <p style="color: var(--text-secondary)">Memuat data server...</p>
-                    </div>
-                </div>
-
-                <!-- Website Monitoring Section -->
-                <div class="section-header" style="margin-top: 2rem; display: flex; justify-content: space-between; align-items: center;">
-                    <h2 class="section-title">🌐 URL & Website yang Dimonitor</h2>
-                    <button id="add-website-btn" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
-                        <span>+</span> Tambah Website
-                    </button>
-                </div>
-                <div id="websites-container" class="server-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
-                    <!-- Loaded dynamically via app.js -->
-                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
-                        <p style="color: var(--text-secondary)">Memuat data website...</p>
                     </div>
                 </div>
             </div>
