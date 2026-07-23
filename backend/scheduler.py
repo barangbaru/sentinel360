@@ -3,9 +3,10 @@ import threading
 import logging
 from datetime import datetime, timedelta
 from .database import SessionLocal
-from .models import Server, Alert, MetricHistory
+from .models import Server, Alert, MetricHistory, Website
 from .ping_worker import ping_server
 from .snmp_worker import poll_snmp_server
+from .website_worker import check_website
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Scheduler")
@@ -76,7 +77,14 @@ def scheduler_loop():
                                 logger.warning(f"ALERT: {alert_msg}")
                                 
                         db.commit()
-                        
+
+            # Polling website status by URL
+            websites = db.query(Website).all()
+            for website in websites:
+                try:
+                    check_website(db, website)
+                except Exception as e:
+                    logger.error(f"Error checking website {website.name} ({website.url}): {e}")
         except Exception as e:
             logger.error(f"Scheduler exception: {e}")
         finally:

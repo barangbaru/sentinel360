@@ -13,14 +13,17 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from .database import engine, get_db, Base, SessionLocal
-from .models import Server, MetricHistory, Alert, User
+from .models import Server, MetricHistory, Alert, User, Website
 from .schemas import (
     ServerCreate,
     ServerResponse,
     AgentMetricReport,
     AlertResponse,
     MetricHistoryResponse,
-    PublicServerResponse
+    PublicServerResponse,
+    WebsiteCreate,
+    WebsiteResponse,
+    PublicWebsiteResponse
 )
 from .scheduler import start_scheduler
 
@@ -322,6 +325,65 @@ def delete_server(
     db.delete(server)
     db.commit()
     return
+
+@app.get("/api/websites", response_model=List[WebsiteResponse])
+def list_websites(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "view"]))
+):
+    """
+    Get all registered website monitors.
+    """
+    return db.query(Website).all()
+
+@app.post("/api/websites", response_model=WebsiteResponse)
+def create_website(
+    website: WebsiteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    """
+    Add a new website monitor.
+    """
+    existing = db.query(Website).filter(Website.url == website.url).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Website URL already registered")
+        
+    db_website = Website(
+        name=website.name,
+        url=website.url,
+        status="unknown"
+    )
+    db.add(db_website)
+    db.commit()
+    db.refresh(db_website)
+    return db_website
+
+@app.delete("/api/websites/{website_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_website(
+    website_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    """
+    Delete a website monitor from database.
+    """
+    website = db.query(Website).filter(Website.id == website_id).first()
+    if not website:
+        raise HTTPException(status_code=404, detail="Website not found")
+    db.delete(website)
+    db.commit()
+    return
+
+@app.get("/api/public/websites", response_model=List[PublicWebsiteResponse])
+def list_public_websites(
+    db: Session = Depends(get_db)
+):
+    """
+    Get all registered websites for the public TV display (no login required).
+    """
+    return db.query(Website).all()
+
 
 @app.get("/api/servers/{server_id}/metrics", response_model=List[MetricHistoryResponse])
 def get_server_metrics(

@@ -84,3 +84,38 @@ class AgentMetricReport(BaseModel):
     network_tx: Optional[float] = 0.0
     os_info: str
     uptime: str
+
+class WebsiteBase(BaseModel):
+    name: str
+    url: str
+
+class WebsiteCreate(WebsiteBase):
+    pass
+
+class WebsiteResponse(WebsiteBase):
+    id: int
+    status: str
+    response_time: Optional[float] = None
+    status_code: Optional[int] = None
+    ssl_status: str
+    ssl_expiry: Optional[datetime] = None
+    ssl_days_left: Optional[int] = None
+    last_checked: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class PublicWebsiteResponse(WebsiteBase):
+    id: int
+    status: str
+    response_time: Optional[float] = None
+    status_code: Optional[int] = None
+    ssl_status: str
+    ssl_expiry: Optional[datetime] = None
+    ssl_days_left: Optional[int] = None
+    last_checked: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+    class Config:
+        from_attributes = True

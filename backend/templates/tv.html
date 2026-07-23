@@ -264,14 +264,29 @@
         </div>
     </header>
 
+    <!-- Server Wallboard Grid -->
+    <div style="font-family: var(--font-display); font-size: 1.1rem; font-weight: bold; color: var(--text-secondary); margin: 1.5rem 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem;">
+        🖥️ SERVER MONITOR
+    </div>
     <div id="tv-servers-container" class="tv-grid">
         <div class="tv-empty">
-            <h3>Memuat data monitoring...</h3>
+            <h3>Memuat data server...</h3>
+        </div>
+    </div>
+
+    <!-- Website Wallboard Grid -->
+    <div style="font-family: var(--font-display); font-size: 1.1rem; font-weight: bold; color: var(--text-secondary); margin: 2rem 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem;">
+        🌐 WEBSITE MONITOR
+    </div>
+    <div id="tv-websites-container" class="tv-grid">
+        <div class="tv-empty">
+            <h3>Memuat data website...</h3>
         </div>
     </div>
 
     <script>
         let cachedTvServers = [];
+        let cachedTvWebsites = [];
 
         // Drag and drop handler for TV Wallboard
         function setupDragAndDrop() {
@@ -337,6 +352,75 @@
                         
                         renderTvServers(cachedTvServers);
                         setupDragAndDrop();
+                    }
+                }
+            };
+        }
+
+        // Drag and drop handler for TV Web Wallboard
+        function setupWebDragAndDrop() {
+            const container = document.getElementById("tv-websites-container");
+            if (!container) return;
+
+            let draggedItem = null;
+
+            container.ondragstart = (e) => {
+                const card = e.target.closest('[draggable="true"]');
+                if (card) {
+                    draggedItem = card;
+                    e.dataTransfer.effectAllowed = 'move';
+                    card.style.opacity = '0.5';
+                }
+            };
+
+            container.ondragend = (e) => {
+                const card = e.target.closest('[draggable="true"]');
+                if (card) {
+                    card.style.opacity = '1';
+                }
+                draggedItem = null;
+                container.querySelectorAll('[draggable="true"]').forEach(c => {
+                    c.style.border = '';
+                });
+            };
+
+            container.ondragover = (e) => {
+                e.preventDefault();
+                const card = e.target.closest('[draggable="true"]');
+                if (card && card !== draggedItem) {
+                    e.dataTransfer.dropEffect = 'move';
+                    card.style.border = '2px dashed var(--accent)';
+                }
+            };
+
+            container.ondragleave = (e) => {
+                const card = e.target.closest('[draggable="true"]');
+                if (card && card !== draggedItem) {
+                    card.style.border = '';
+                }
+            };
+
+            container.ondrop = (e) => {
+                e.preventDefault();
+                const card = e.target.closest('[draggable="true"]');
+                if (card && card !== draggedItem && draggedItem) {
+                    card.style.border = '';
+                    
+                    const draggedId = parseInt(draggedItem.getAttribute('data-id'), 10);
+                    const targetId = parseInt(card.getAttribute('data-id'), 10);
+                    
+                    const draggedIndex = cachedTvWebsites.findIndex(s => s.id === draggedId);
+                    const targetIndex = cachedTvWebsites.findIndex(s => s.id === targetId);
+                    
+                    if (draggedIndex !== -1 && targetIndex !== -1) {
+                        const [removed] = cachedTvWebsites.splice(draggedIndex, 1);
+                        cachedTvWebsites.splice(targetIndex, 0, removed);
+                        
+                        const newOrder = cachedTvWebsites.map(s => s.id);
+                        localStorage.setItem('sentinel360_tv_website_order', JSON.stringify(newOrder));
+                        
+                        renderTvWebsites(cachedTvWebsites);
+                        setupWebDragAndDrop();
                     }
                 }
             };
@@ -479,7 +563,69 @@
             }).join("");
         }
 
-        // Fetch & Render Status Loop
+        // Render TV Website Cards helper
+        function renderTvWebsites(websites) {
+            const container = document.getElementById("tv-websites-container");
+            if (!container) return;
+
+            if (websites.length === 0) {
+                container.innerHTML = `
+                    <div class="tv-empty" style="grid-column: 1/-1;">
+                        <h3>Belum ada website yang didaftarkan.</h3>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = websites.map(web => {
+                const isOnline = web.status === "online";
+                const isOffline = web.status === "offline";
+                const statusClass = isOnline ? "status-online" : (isOffline ? "status-offline" : "status-unknown");
+                const statusText = web.status;
+
+                let sslBadge = "";
+                if (web.ssl_status === "valid") {
+                    sslBadge = `<span class="tv-badge" style="background: rgba(16, 185, 129, 0.15); border-color: var(--online); color: var(--online); font-size: 0.6rem;">SSL: ${web.ssl_days_left}d left</span>`;
+                } else if (web.ssl_status === "warning") {
+                    sslBadge = `<span class="tv-badge" style="background: rgba(245, 158, 11, 0.15); border-color: var(--warning); color: var(--warning); font-size: 0.6rem;">SSL Warning: ${web.ssl_days_left}d</span>`;
+                } else if (web.ssl_status === "expired") {
+                    sslBadge = `<span class="tv-badge" style="background: rgba(239, 68, 68, 0.15); border-color: var(--offline); color: var(--offline); font-size: 0.6rem;">SSL EXPIRED</span>`;
+                } else if (web.ssl_status === "invalid") {
+                    sslBadge = `<span class="tv-badge" style="background: rgba(239, 68, 68, 0.15); border-color: var(--offline); color: var(--offline); font-size: 0.6rem;">SSL INVALID</span>`;
+                } else {
+                    sslBadge = `<span class="tv-badge" style="font-size: 0.6rem;">No SSL</span>`;
+                }
+
+                const latencyVal = web.response_time !== null ? `${Math.round(web.response_time)} ms` : "N/A";
+                const codeVal = web.status_code !== null ? web.status_code : "FAIL";
+
+                return `
+                    <div class="tv-card ${statusClass}" draggable="true" data-id="${web.id}" style="height: 145px;">
+                        <div>
+                            <div class="tv-card-header" style="margin-bottom: 0.35rem;">
+                                <div>
+                                    <div class="tv-server-name" title="${web.name}">${web.name}</div>
+                                    <div class="tv-server-ip" style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${web.url}</div>
+                                </div>
+                                <span class="tv-status-dot"></span>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; margin-top: 0.35rem; margin-bottom: 0.35rem; font-size: 0.75rem; background: rgba(255,255,255,0.02); padding: 0.4rem; border-radius: 5px; border: 1px solid var(--border-color);">
+                                <div>HTTP Code: <strong style="color: ${isOnline ? 'var(--online)' : 'var(--offline)'}">${codeVal}</strong></div>
+                                <div>Latency: <strong>${latencyVal}</strong></div>
+                            </div>
+                        </div>
+                        
+                        <div class="tv-card-footer">
+                            ${sslBadge}
+                            <span>Checked: ${web.last_checked ? new Date(web.last_checked).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never"}</span>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        // Fetch & Render Server Status
         async function fetchStatus() {
             const container = document.getElementById("tv-servers-container");
             try {
@@ -522,7 +668,6 @@
                     }
                 }
 
-                // Use the updated list
                 cachedTvServers = servers;
                 renderTvServers(cachedTvServers);
                 setupDragAndDrop();
@@ -531,9 +676,48 @@
             }
         }
 
+        // Fetch & Render Website Status
+        async function fetchWebsitesStatus() {
+            const container = document.getElementById("tv-websites-container");
+            if (!container) return;
+            try {
+                const res = await fetch("/api/public/websites");
+                if (!res.ok) throw new Error("Connection lost to Sentinel360");
+                const websites = await res.json();
+
+                // Sort according to saved TV order
+                const savedOrder = localStorage.getItem('sentinel360_tv_website_order');
+                if (savedOrder) {
+                    try {
+                        const orderArray = JSON.parse(savedOrder);
+                        websites.sort((a, b) => {
+                            let idxA = orderArray.indexOf(a.id);
+                            let idxB = orderArray.indexOf(b.id);
+                            if (idxA === -1) idxA = 9999;
+                            if (idxB === -1) idxB = 9999;
+                            return idxA - idxB;
+                        });
+                    } catch(e) {
+                        console.error("Error parsing saved website order:", e);
+                    }
+                }
+
+                cachedTvWebsites = websites;
+                renderTvWebsites(cachedTvWebsites);
+                setupWebDragAndDrop();
+            } catch (error) {
+                console.error("Error polling TV website status:", error);
+            }
+        }
+
         // Run status poll loop every 5 seconds
-        fetchStatus();
-        setInterval(fetchStatus, 5000);
+        function pollAll() {
+            fetchStatus();
+            fetchWebsitesStatus();
+        }
+        
+        pollAll();
+        setInterval(pollAll, 5000);
     </script>
 </body>
 </html>

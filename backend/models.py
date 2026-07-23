@@ -70,3 +70,18 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(String, default="view", nullable=False)  # "admin" or "view"
     is_active = Column(Boolean, default=True, nullable=False)
+
+class Website(Base):
+    __tablename__ = "websites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    url = Column(String, nullable=False, unique=True, index=True)
+    status = Column(String, default="unknown")     # "online", "offline", "unknown"
+    response_time = Column(Float, nullable=True)   # latency in ms
+    status_code = Column(Integer, nullable=True)    # HTTP status code
+    ssl_status = Column(String, default="unknown")  # "valid", "warning", "expired", "none", "unknown"
+    ssl_expiry = Column(DateTime, nullable=True)
+    ssl_days_left = Column(Integer, nullable=True)
+    last_checked = Column(DateTime, nullable=True)
+    error_message = Column(String, nullable=True)

@@ -484,15 +484,264 @@ function initDashboard() {
         }
     };
 
+    let cachedWebsites = [];
+    let websitePollInterval;
+
+    const addWebsiteBtn = document.getElementById("add-website-btn");
+    if (addWebsiteBtn && typeof USER_ROLE !== "undefined" && USER_ROLE === "view") {
+        addWebsiteBtn.style.display = "none";
+    }
+    const addWebModal = document.getElementById("add-website-modal");
+    const addWebForm = document.getElementById("add-website-form");
+    const cancelWebModalBtn = document.getElementById("cancel-website-modal-btn");
+
+    if (addWebsiteBtn && addWebModal) {
+        addWebsiteBtn.addEventListener("click", () => {
+            addWebForm.reset();
+            addWebModal.showModal();
+        });
+    }
+
+    if (cancelWebModalBtn && addWebModal) {
+        cancelWebModalBtn.addEventListener("click", () => {
+            addWebModal.close();
+        });
+    }
+
+    if (addWebForm && addWebModal) {
+        addWebForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const name = document.getElementById("web_name").value;
+            const url = document.getElementById("web_url").value;
+
+            try {
+                const res = await fetch("/api/websites", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, url })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.detail || "Gagal menyimpan website.");
+                }
+
+                addWebModal.close();
+                loadWebsites();
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
+    }
+
+    // Load Websites
+    async function loadWebsites() {
+        const container = document.getElementById("websites-container");
+        if (!container) return;
+        try {
+            const res = await fetch("/api/websites");
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
+            if (!res.ok) throw new Error("Failed to fetch websites");
+            const websites = await res.json();
+
+            // Sort according to saved order
+            const savedOrder = localStorage.getItem('sentinel360_website_order');
+            if (savedOrder) {
+                try {
+                    const orderArray = JSON.parse(savedOrder);
+                    websites.sort((a, b) => {
+                        let idxA = orderArray.indexOf(a.id);
+                        let idxB = orderArray.indexOf(b.id);
+                        if (idxA === -1) idxA = 9999;
+                        if (idxB === -1) idxB = 9999;
+                        return idxA - idxB;
+                    });
+                } catch(e) {
+                    console.error("Error parsing saved website order:", e);
+                }
+            }
+
+            cachedWebsites = websites;
+            renderWebsites(cachedWebsites);
+            setupWebDragAndDrop();
+        } catch (error) {
+            console.error("Error loading websites:", error);
+        }
+    }
+
+    function renderWebsites(websites) {
+        const container = document.getElementById("websites-container");
+        if (!container) return;
+
+        if (websites.length === 0) {
+            container.innerHTML = `
+                <div class="card" style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.4;">🌐</div>
+                    <h4 style="margin-bottom: 0.5rem;">Belum Ada Website</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem;">Daftarkan website/URL target untuk memantau status & SSL.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const hideDeleteBtn = (typeof USER_ROLE !== "undefined" && USER_ROLE === "view") ? "display: none;" : "";
+
+        container.innerHTML = websites.map(web => {
+            const isOnline = web.status === "online";
+            const isOffline = web.status === "offline";
+            const statusClass = isOnline ? "status-online" : (isOffline ? "status-offline" : "status-unknown");
+            const statusText = web.status;
+
+            // SSL details
+            let sslBadge = "";
+            if (web.ssl_status === "valid") {
+                sslBadge = `<span class="monitor-type-badge" style="background: rgba(16, 185, 129, 0.15); border-color: var(--online); color: var(--online); font-size: 0.65rem;">SSL: ${web.ssl_days_left}d left</span>`;
+            } else if (web.ssl_status === "warning") {
+                sslBadge = `<span class="monitor-type-badge" style="background: rgba(245, 158, 11, 0.15); border-color: var(--warning); color: var(--warning); font-size: 0.65rem;">SSL Expiring: ${web.ssl_days_left}d</span>`;
+            } else if (web.ssl_status === "expired") {
+                sslBadge = `<span class="monitor-type-badge" style="background: rgba(239, 68, 68, 0.15); border-color: var(--offline); color: var(--offline); font-size: 0.65rem;">SSL EXPIRED</span>`;
+            } else if (web.ssl_status === "invalid") {
+                sslBadge = `<span class="monitor-type-badge" style="background: rgba(239, 68, 68, 0.15); border-color: var(--offline); color: var(--offline); font-size: 0.65rem;">SSL INVALID</span>`;
+            } else {
+                sslBadge = `<span class="monitor-type-badge" style="font-size: 0.65rem;">No SSL (HTTP)</span>`;
+            }
+
+            const latencyVal = web.response_time !== null ? `${Math.round(web.response_time)} ms` : "N/A";
+            const codeVal = web.status_code !== null ? web.status_code : "FAIL";
+
+            return `
+                <div class="card ${statusClass}" draggable="true" data-id="${web.id}">
+                    <div class="card-header" style="margin-bottom: 0.75rem;">
+                        <div class="server-title-container">
+                            <span class="server-name" style="font-size: 0.95rem;">${web.name}</span>
+                            <a href="${web.url}" target="_blank" class="server-ip" style="text-decoration: underline; color: var(--accent); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${web.url}</a>
+                        </div>
+                        <span class="status-badge ${statusClass}">
+                            <span class="dot"></span> ${statusText}
+                        </span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.8rem; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <div><strong>HTTP Code:</strong> <span style="color: ${isOnline ? 'var(--online)' : 'var(--offline)'}; font-weight: bold;">${codeVal}</span></div>
+                        <div><strong>Latency:</strong> ${latencyVal}</div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                        <div>Last Check: ${web.last_checked ? new Date(web.last_checked).toLocaleTimeString() : "Never"}</div>
+                        ${sslBadge}
+                    </div>
+
+                    ${web.error_message ? `
+                    <div style="font-size: 0.7rem; color: var(--offline); background: rgba(239, 68, 68, 0.05); padding: 0.4rem; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.15); margin-bottom: 0.75rem; max-height: 45px; overflow-y: auto; word-break: break-all;">
+                        ${web.error_message}
+                    </div>` : ""}
+
+                    <div class="server-footer" style="margin-top: auto; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); justify-content: flex-end;">
+                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444; ${hideDeleteBtn}" onclick="deleteWebsite(${web.id})">
+                            Hapus
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    // Delete Website
+    window.deleteWebsite = async function(webId) {
+        if (!confirm("Apakah Anda yakin ingin menghapus monitoring website ini?")) return;
+        try {
+            const res = await fetch(`/api/websites/${webId}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Gagal menghapus website");
+            loadWebsites();
+        } catch (error) {
+            alert(error.message);
+        }
+    };
+
+    // Drag and drop handler for Websites
+    function setupWebDragAndDrop() {
+        const container = document.getElementById("websites-container");
+        if (!container) return;
+
+        let draggedItem = null;
+
+        container.ondragstart = (e) => {
+            const card = e.target.closest('[draggable="true"]');
+            if (card) {
+                draggedItem = card;
+                e.dataTransfer.effectAllowed = 'move';
+                card.style.opacity = '0.5';
+            }
+        };
+
+        container.ondragend = (e) => {
+            const card = e.target.closest('[draggable="true"]');
+            if (card) {
+                card.style.opacity = '1';
+            }
+            draggedItem = null;
+            container.querySelectorAll('[draggable="true"]').forEach(c => {
+                c.style.border = '';
+            });
+        };
+
+        container.ondragover = (e) => {
+            e.preventDefault();
+            const card = e.target.closest('[draggable="true"]');
+            if (card && card !== draggedItem) {
+                e.dataTransfer.dropEffect = 'move';
+                card.style.border = '2px dashed var(--accent)';
+            }
+        };
+
+        container.ondragleave = (e) => {
+            const card = e.target.closest('[draggable="true"]');
+            if (card && card !== draggedItem) {
+                card.style.border = '';
+            }
+        };
+
+        container.ondrop = (e) => {
+            e.preventDefault();
+            const card = e.target.closest('[draggable="true"]');
+            if (card && card !== draggedItem && draggedItem) {
+                card.style.border = '';
+                
+                const draggedId = parseInt(draggedItem.getAttribute('data-id'), 10);
+                const targetId = parseInt(card.getAttribute('data-id'), 10);
+                
+                const draggedIndex = cachedWebsites.findIndex(s => s.id === draggedId);
+                const targetIndex = cachedWebsites.findIndex(s => s.id === targetId);
+                
+                if (draggedIndex !== -1 && targetIndex !== -1) {
+                    const [removed] = cachedWebsites.splice(draggedIndex, 1);
+                    cachedWebsites.splice(targetIndex, 0, removed);
+                    
+                    const newOrder = cachedWebsites.map(s => s.id);
+                    localStorage.setItem('sentinel360_website_order', JSON.stringify(newOrder));
+                    
+                    renderWebsites(cachedWebsites);
+                    setupWebDragAndDrop();
+                }
+            }
+        };
+    }
+
     // Initial load and start interval polling
     loadServers();
+    loadWebsites();
     loadAlerts();
     serverPollInterval = setInterval(loadServers, 5000);
+    websitePollInterval = setInterval(loadWebsites, 5000);
     alertPollInterval = setInterval(loadAlerts, 5000);
 
     // Stop intervals when page changes (navigating away)
     window.addEventListener("beforeunload", () => {
         clearInterval(serverPollInterval);
+        clearInterval(websitePollInterval);
         clearInterval(alertPollInterval);
     });
 }

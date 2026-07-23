@@ -52,6 +52,20 @@
                         <p style="color: var(--text-secondary)">Memuat data server...</p>
                     </div>
                 </div>
+
+                <!-- Website Monitoring Section -->
+                <div class="section-header" style="margin-top: 2rem; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="section-title">🌐 URL & Website yang Dimonitor</h2>
+                    <button id="add-website-btn" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+                        <span>+</span> Tambah Website
+                    </button>
+                </div>
+                <div id="websites-container" class="server-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+                    <!-- Loaded dynamically via app.js -->
+                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                        <p style="color: var(--text-secondary)">Memuat data website...</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Right Side: Alerts Sidebar -->
@@ -118,6 +132,29 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Simpan Perangkat</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- NATIVE MODAL: TAMBAH WEBSITE -->
+    <dialog id="add-website-modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Tambah Website Baru</h3>
+            <button class="modal-close" id="cancel-website-modal-btn">&times;</button>
+        </div>
+        <form id="add-website-form">
+            <div class="form-group">
+                <label for="web_name" class="form-label">Nama Website / Label</label>
+                <input type="text" id="web_name" class="form-input" placeholder="contoh: Portal Utama Perusahaan" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="web_url" class="form-label">URL Website (harus diawali http:// atau https://)</label>
+                <input type="url" id="web_url" class="form-input" placeholder="contoh: https://sentinel360.com" required>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Simpan Website</button>
             </div>
         </form>
     </dialog>
