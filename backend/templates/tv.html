@@ -247,6 +247,7 @@
         <div class="header-title-sec">
             <div class="logo-icon" style="width: 1.8rem; height: 1.8rem; font-size: 0.9rem;">S</div>
             <span class="wallboard-title">SENTINEL360 NOC DISPLAY</span>
+            <span id="live-date" class="display-clock" style="font-size: 1rem; color: var(--text-secondary); background: rgba(255,255,255,0.03); border-color: var(--border-color); font-weight: 600;">-</span>
             <span id="live-time" class="display-clock">00:00:00</span>
         </div>
 
@@ -270,12 +271,88 @@
     </div>
 
     <script>
-        // Update Live Clock
+        let cachedTvServers = [];
+
+        // Drag and drop handler for TV Wallboard
+        function setupDragAndDrop() {
+            const container = document.getElementById("tv-servers-container");
+            if (!container) return;
+
+            let draggedItem = null;
+
+            container.ondragstart = (e) => {
+                const card = e.target.closest('[draggable="true"]');
+                if (card) {
+                    draggedItem = card;
+                    e.dataTransfer.effectAllowed = 'move';
+                    card.style.opacity = '0.5';
+                }
+            };
+
+            container.ondragend = (e) => {
+                const card = e.target.closest('[draggable="true"]');
+                if (card) {
+                    card.style.opacity = '1';
+                }
+                draggedItem = null;
+                container.querySelectorAll('[draggable="true"]').forEach(c => {
+                    c.style.border = '';
+                });
+            };
+
+            container.ondragover = (e) => {
+                e.preventDefault();
+                const card = e.target.closest('[draggable="true"]');
+                if (card && card !== draggedItem) {
+                    e.dataTransfer.dropEffect = 'move';
+                    card.style.border = '2px dashed var(--accent)';
+                }
+            };
+
+            container.ondragleave = (e) => {
+                const card = e.target.closest('[draggable="true"]');
+                if (card && card !== draggedItem) {
+                    card.style.border = '';
+                }
+            };
+
+            container.ondrop = (e) => {
+                e.preventDefault();
+                const card = e.target.closest('[draggable="true"]');
+                if (card && card !== draggedItem && draggedItem) {
+                    card.style.border = '';
+                    
+                    const draggedId = parseInt(draggedItem.getAttribute('data-id'), 10);
+                    const targetId = parseInt(card.getAttribute('data-id'), 10);
+                    
+                    const draggedIndex = cachedTvServers.findIndex(s => s.id === draggedId);
+                    const targetIndex = cachedTvServers.findIndex(s => s.id === targetId);
+                    
+                    if (draggedIndex !== -1 && targetIndex !== -1) {
+                        const [removed] = cachedTvServers.splice(draggedIndex, 1);
+                        cachedTvServers.splice(targetIndex, 0, removed);
+                        
+                        const newOrder = cachedTvServers.map(s => s.id);
+                        localStorage.setItem('sentinel360_tv_server_order', JSON.stringify(newOrder));
+                        
+                        renderTvServers(cachedTvServers);
+                        setupDragAndDrop();
+                    }
+                }
+            };
+        }
+
+        // Update Live Clock & Date
         function updateClock() {
             const clockEl = document.getElementById("live-time");
+            const dateEl = document.getElementById("live-date");
+            const now = new Date();
             if (clockEl) {
-                const now = new Date();
                 clockEl.textContent = now.toLocaleTimeString([], { hour12: false });
+            }
+            if (dateEl) {
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                dateEl.textContent = now.toLocaleDateString('id-ID', options);
             }
         }
         setInterval(updateClock, 1000);
@@ -295,6 +372,111 @@
                     fsBtn.textContent = "⛶ Fullscreen";
                 }
             });
+        }
+
+        // Render TV Server Cards helper
+        function renderTvServers(servers) {
+            const container = document.getElementById("tv-servers-container");
+            container.innerHTML = servers.map(server => {
+                const isOnline = server.status === "online";
+                const statusClass = isOnline ? "status-online" : "status-offline";
+                
+                let metricsHtml = "";
+                if (isOnline && (server.monitor_type === "agent" || server.monitor_type === "snmp")) {
+                    const cpu = server.cpu_usage !== null ? Math.round(server.cpu_usage) : null;
+                    const ram = server.ram_usage !== null ? Math.round(server.ram_usage) : null;
+                    const disk = server.disk_usage !== null ? Math.round(server.disk_usage) : null;
+
+                    const getBarColor = (val) => {
+                        if (val >= 90) return "danger";
+                        if (val >= 70) return "warning";
+                        return "normal";
+                    };
+
+                    let ramStr = "";
+                    if (ram !== null && server.ram_total) {
+                        const ramUsed = (ram / 100) * parseFloat(server.ram_total);
+                        ramStr = `(${ramUsed.toFixed(1)}G/${parseFloat(server.ram_total).toFixed(1)}G)`;
+                    }
+
+                    let diskStr = "";
+                    if (disk !== null && server.disk_total) {
+                        const diskUsed = (disk / 100) * parseFloat(server.disk_total);
+                        diskStr = `(${diskUsed.toFixed(1)}G/${parseFloat(server.disk_total).toFixed(1)}G)`;
+                    }
+
+                    metricsHtml = `
+                        <div class="tv-metrics">
+                            ${cpu !== null ? `
+                            <div class="tv-metric-row">
+                                <div class="tv-metric-labels">
+                                    <span>CPU</span>
+                                    <span class="tv-metric-val">${cpu}%</span>
+                                </div>
+                                <div class="tv-progress-bg">
+                                    <div class="tv-progress-fill ${getBarColor(cpu)}" style="width: ${cpu}%"></div>
+                                </div>
+                            </div>` : ""}
+                            
+                            ${ram !== null ? `
+                            <div class="tv-metric-row">
+                                <div class="tv-metric-labels">
+                                    <span>RAM ${ramStr}</span>
+                                    <span class="tv-metric-val">${ram}%</span>
+                                </div>
+                                <div class="tv-progress-bg">
+                                    <div class="tv-progress-fill ${getBarColor(ram)}" style="width: ${ram}%"></div>
+                                </div>
+                            </div>` : ""}
+                            
+                            ${disk !== null ? `
+                            <div class="tv-metric-row">
+                                <div class="tv-metric-labels">
+                                    <span>DISK ${diskStr}</span>
+                                    <span class="tv-metric-val">${disk}%</span>
+                                </div>
+                                <div class="tv-progress-bg">
+                                    <div class="tv-progress-fill ${getBarColor(disk)}" style="width: ${disk}%"></div>
+                                </div>
+                            </div>` : ""}
+                        </div>
+                    `;
+                } else if (isOnline && server.monitor_type === "ping") {
+                    metricsHtml = `
+                        <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; color: var(--online); font-size: 0.8rem; font-weight: 700; height: 75px;">
+                            ICMP LINK ACTIVE
+                        </div>
+                    `;
+                } else {
+                    metricsHtml = `
+                        <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem; height: 75px;">
+                            OFFLINE / DISCONNECTED
+                        </div>
+                    `;
+                }
+
+                const lastSeenStr = server.last_seen ? new Date(server.last_seen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never";
+
+                return `
+                    <div class="tv-card ${statusClass}" draggable="true" data-id="${server.id}">
+                        <div>
+                            <div class="tv-card-header">
+                                <div>
+                                    <div class="tv-server-name" title="${server.name}">${server.name}</div>
+                                    <div class="tv-server-ip">${server.ip_address}</div>
+                                </div>
+                                <span class="tv-status-dot"></span>
+                            </div>
+                            ${metricsHtml}
+                        </div>
+                        
+                        <div class="tv-card-footer">
+                            <span class="tv-badge">${server.monitor_type}</span>
+                            <span>Seen: ${lastSeenStr}</span>
+                        </div>
+                    </div>
+                `;
+            }).join("");
         }
 
         // Fetch & Render Status Loop
@@ -323,111 +505,29 @@
                     return;
                 }
 
-                container.innerHTML = servers.map(server => {
-                    const isOnline = server.status === "online";
-                    const statusClass = isOnline ? "status-online" : "status-offline";
-                    
-                    let metricsHtml = "";
-                    if (isOnline && (server.monitor_type === "agent" || server.monitor_type === "snmp")) {
-                        const cpu = server.cpu_usage !== null ? Math.round(server.cpu_usage) : null;
-                        const ram = server.ram_usage !== null ? Math.round(server.ram_usage) : null;
-                        const disk = server.disk_usage !== null ? Math.round(server.disk_usage) : null;
-
-                        const getBarColor = (val) => {
-                            if (val >= 90) return "danger";
-                            if (val >= 70) return "warning";
-                            return "normal";
-                        };
-
-                        // Compute RAM string
-                        let ramStr = "";
-                        if (ram !== null && server.ram_total) {
-                            const ramUsed = (ram / 100) * parseFloat(server.ram_total);
-                            ramStr = `(${ramUsed.toFixed(1)}G/${parseFloat(server.ram_total).toFixed(1)}G)`;
-                        }
-
-                        // Compute Disk string
-                        let diskStr = "";
-                        if (disk !== null && server.disk_total) {
-                            const diskUsed = (disk / 100) * parseFloat(server.disk_total);
-                            diskStr = `(${diskUsed.toFixed(1)}G/${parseFloat(server.disk_total).toFixed(1)}G)`;
-                        }
-
-                        metricsHtml = `
-                            <div class="tv-metrics">
-                                ${cpu !== null ? `
-                                <div class="tv-metric-row">
-                                    <div class="tv-metric-labels">
-                                        <span>CPU</span>
-                                        <span class="tv-metric-val">${cpu}%</span>
-                                    </div>
-                                    <div class="tv-progress-bg">
-                                        <div class="tv-progress-fill ${getBarColor(cpu)}" style="width: ${cpu}%"></div>
-                                    </div>
-                                </div>` : ""}
-                                
-                                ${ram !== null ? `
-                                <div class="tv-metric-row">
-                                    <div class="tv-metric-labels">
-                                        <span>RAM ${ramStr}</span>
-                                        <span class="tv-metric-val">${ram}%</span>
-                                    </div>
-                                    <div class="tv-progress-bg">
-                                        <div class="tv-progress-fill ${getBarColor(ram)}" style="width: ${ram}%"></div>
-                                    </div>
-                                </div>` : ""}
-                                
-                                ${disk !== null ? `
-                                <div class="tv-metric-row">
-                                    <div class="tv-metric-labels">
-                                        <span>DISK ${diskStr}</span>
-                                        <span class="tv-metric-val">${disk}%</span>
-                                    </div>
-                                    <div class="tv-progress-bg">
-                                        <div class="tv-progress-fill ${getBarColor(disk)}" style="width: ${disk}%"></div>
-                                    </div>
-                                </div>` : ""}
-                            </div>
-                        `;
-                    } else if (isOnline && server.monitor_type === "ping") {
-                        metricsHtml = `
-                            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; color: var(--online); font-size: 0.8rem; font-weight: 700; height: 75px;">
-                                ICMP LINK ACTIVE
-                            </div>
-                        `;
-                    } else {
-                        metricsHtml = `
-                            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem; height: 75px;">
-                                OFFLINE / DISCONNECTED
-                            </div>
-                        `;
+                // Sort according to saved TV order
+                const savedOrder = localStorage.getItem('sentinel360_tv_server_order');
+                if (savedOrder) {
+                    try {
+                        const orderArray = JSON.parse(savedOrder);
+                        servers.sort((a, b) => {
+                            let idxA = orderArray.indexOf(a.id);
+                            let idxB = orderArray.indexOf(b.id);
+                            if (idxA === -1) idxA = 9999;
+                            if (idxB === -1) idxB = 9999;
+                            return idxA - idxB;
+                        });
+                    } catch(e) {
+                        console.error("Error parsing saved order:", e);
                     }
+                }
 
-                    const lastSeenStr = server.last_seen ? new Date(server.last_seen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never";
-
-                    return `
-                        <div class="tv-card ${statusClass}">
-                            <div>
-                                <div class="tv-card-header">
-                                    <div>
-                                        <div class="tv-server-name" title="${server.name}">${server.name}</div>
-                                        <div class="tv-server-ip">${server.ip_address}</div>
-                                    </div>
-                                    <span class="tv-status-dot"></span>
-                                </div>
-                                ${metricsHtml}
-                            </div>
-                            
-                            <div class="tv-card-footer">
-                                <span class="tv-badge">${server.monitor_type}</span>
-                                <span>Seen: ${lastSeenStr}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join("");
+                // Use the updated list
+                cachedTvServers = servers;
+                renderTvServers(cachedTvServers);
+                setupDragAndDrop();
             } catch (error) {
                 console.error("Error polling TV status:", error);
-                // Keep the existing display or show small error banner if needed
             }
         }
 

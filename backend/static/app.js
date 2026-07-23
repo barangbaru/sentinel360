@@ -114,6 +114,77 @@ function initDashboard() {
         addModal.close();
     });
 
+    let cachedServers = [];
+
+    // Drag and drop handler
+    function setupDragAndDrop() {
+        const container = document.getElementById("servers-container");
+        if (!container) return;
+
+        let draggedItem = null;
+
+        container.ondragstart = (e) => {
+            const card = e.target.closest('[draggable="true"]');
+            if (card) {
+                draggedItem = card;
+                e.dataTransfer.effectAllowed = 'move';
+                card.style.opacity = '0.5';
+            }
+        };
+
+        container.ondragend = (e) => {
+            const card = e.target.closest('[draggable="true"]');
+            if (card) {
+                card.style.opacity = '1';
+            }
+            draggedItem = null;
+            container.querySelectorAll('[draggable="true"]').forEach(c => {
+                c.style.border = '';
+            });
+        };
+
+        container.ondragover = (e) => {
+            e.preventDefault();
+            const card = e.target.closest('[draggable="true"]');
+            if (card && card !== draggedItem) {
+                e.dataTransfer.dropEffect = 'move';
+                card.style.border = '2px dashed var(--accent)';
+            }
+        };
+
+        container.ondragleave = (e) => {
+            const card = e.target.closest('[draggable="true"]');
+            if (card && card !== draggedItem) {
+                card.style.border = '';
+            }
+        };
+
+        container.ondrop = (e) => {
+            e.preventDefault();
+            const card = e.target.closest('[draggable="true"]');
+            if (card && card !== draggedItem && draggedItem) {
+                card.style.border = '';
+                
+                const draggedId = parseInt(draggedItem.getAttribute('data-id'), 10);
+                const targetId = parseInt(card.getAttribute('data-id'), 10);
+                
+                const draggedIndex = cachedServers.findIndex(s => s.id === draggedId);
+                const targetIndex = cachedServers.findIndex(s => s.id === targetId);
+                
+                if (draggedIndex !== -1 && targetIndex !== -1) {
+                    const [removed] = cachedServers.splice(draggedIndex, 1);
+                    cachedServers.splice(targetIndex, 0, removed);
+                    
+                    const newOrder = cachedServers.map(s => s.id);
+                    localStorage.setItem('sentinel360_server_order', JSON.stringify(newOrder));
+                    
+                    renderServers(cachedServers);
+                    setupDragAndDrop();
+                }
+            }
+        };
+    }
+
     // Fetch and Render Servers
     async function loadServers() {
         const container = document.getElementById("servers-container");
@@ -149,7 +220,27 @@ function initDashboard() {
                 throw new Error("Failed to fetch servers: " + res.status);
             }
             const servers = await res.json();
-            renderServers(servers);
+            
+            // Sort according to saved order
+            const savedOrder = localStorage.getItem('sentinel360_server_order');
+            if (savedOrder) {
+                try {
+                    const orderArray = JSON.parse(savedOrder);
+                    servers.sort((a, b) => {
+                        let idxA = orderArray.indexOf(a.id);
+                        let idxB = orderArray.indexOf(b.id);
+                        if (idxA === -1) idxA = 9999;
+                        if (idxB === -1) idxB = 9999;
+                        return idxA - idxB;
+                    });
+                } catch(e) {
+                    console.error("Error parsing saved order:", e);
+                }
+            }
+
+            cachedServers = servers;
+            renderServers(cachedServers);
+            setupDragAndDrop();
         } catch (error) {
             console.error("Error loading servers:", error);
         }
@@ -258,7 +349,7 @@ function initDashboard() {
             }
 
             return `
-                <div class="card ${statusClass}">
+                <div class="card ${statusClass}" draggable="true" data-id="${server.id}">
                     <div class="card-header">
                         <div class="server-title-container">
                             <a href="/server/${server.id}" class="server-name">${server.name}</a>
