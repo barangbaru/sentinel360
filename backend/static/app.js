@@ -1,4 +1,12 @@
 // Sentinel360 Client-side Script
+function parseUTC(dateStr) {
+    if (!dateStr) return null;
+    if (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+') && !/-\d{2}:\d{2}$/.test(dateStr)) {
+        return new Date(dateStr + 'Z');
+    }
+    return new Date(dateStr);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     // Determine page context
     const serverGrid = document.getElementById("servers-container");
@@ -269,7 +277,7 @@ function initDashboard() {
             
             // Format OS & Last Seen
             const osStr = server.os_info || "Checking...";
-            const lastSeenStr = server.last_seen ? new Date(server.last_seen).toLocaleString() : "Never";
+            const lastSeenStr = server.last_seen ? parseUTC(server.last_seen).toLocaleString() : "Never";
             
             // Build metrics UI if online and has agent/SNMP metrics
             let metricsHtml = "";
@@ -460,7 +468,7 @@ function initDashboard() {
 
         const hideResolveBtn = (typeof USER_ROLE !== "undefined" && USER_ROLE === "view") ? "display: none;" : "";
         alertsContainer.innerHTML = alerts.map(alert => {
-            const timeStr = new Date(alert.timestamp).toLocaleTimeString();
+            const timeStr = parseUTC(alert.timestamp).toLocaleTimeString();
             return `
                 <div class="alert-item">
                     <span class="alert-msg">${alert.message}</span>
@@ -630,7 +638,7 @@ function initDashboard() {
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-                        <div>Last Check: ${web.last_checked ? new Date(web.last_checked).toLocaleTimeString() : "Never"}</div>
+                        <div>Last Check: ${web.last_checked ? parseUTC(web.last_checked).toLocaleTimeString() : "Never"}</div>
                         ${sslBadge}
                     </div>
 
@@ -782,7 +790,7 @@ function initDetailPage() {
             
             document.getElementById("detail-os").textContent = server.os_info || "N/A";
             document.getElementById("detail-uptime").textContent = server.uptime || "N/A";
-            document.getElementById("detail-seen").textContent = server.last_seen ? new Date(server.last_seen).toLocaleString() : "Never";
+            document.getElementById("detail-seen").textContent = server.last_seen ? parseUTC(server.last_seen).toLocaleString() : "Never";
             
             // Update RAM/Disk detailed metrics if available
             const ramContainer = document.getElementById("detail-ram-container");
@@ -855,7 +863,7 @@ function initDetailPage() {
 
     function drawCharts(metrics) {
         // Extract data lists
-        const labels = metrics.map(m => new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const labels = metrics.map(m => parseUTC(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         const cpuData = metrics.map(m => m.cpu_usage);
         const ramData = metrics.map(m => m.ram_usage);
         const diskData = metrics.map(m => m.disk_usage);
@@ -1042,7 +1050,7 @@ function initDetailPage() {
                 const csvRows = [headers.join(",")];
                 
                 metrics.forEach(m => {
-                    const timeStr = new Date(m.timestamp).toLocaleString();
+                    const timeStr = parseUTC(m.timestamp).toLocaleString();
                     const row = [
                         `"${timeStr}"`,
                         m.cpu_usage !== null ? m.cpu_usage.toFixed(1) : "",

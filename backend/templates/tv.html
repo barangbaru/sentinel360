@@ -285,6 +285,14 @@
     </div>
 
     <script>
+        function parseUTC(dateStr) {
+            if (!dateStr) return null;
+            if (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+') && !/-\d{2}:\d{2}$/.test(dateStr)) {
+                return new Date(dateStr + 'Z');
+            }
+            return new Date(dateStr);
+        }
+
         let cachedTvServers = [];
         let cachedTvWebsites = [];
 
@@ -539,7 +547,7 @@
                     `;
                 }
 
-                const lastSeenStr = server.last_seen ? new Date(server.last_seen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never";
+                const lastSeenStr = server.last_seen ? parseUTC(server.last_seen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never";
 
                 return `
                     <div class="tv-card ${statusClass}" draggable="true" data-id="${server.id}">
@@ -618,7 +626,7 @@
                         
                         <div class="tv-card-footer">
                             ${sslBadge}
-                            <span>Checked: ${web.last_checked ? new Date(web.last_checked).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never"}</span>
+                            <span>Checked: ${web.last_checked ? parseUTC(web.last_checked).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never"}</span>
                         </div>
                     </div>
                 `;
