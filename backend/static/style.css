@@ -517,12 +517,28 @@ dialog::backdrop {
     width: 100%;
     padding: 0.6rem 0.8rem;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.03);
+    background: #0f172a;
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     font-family: var(--font-primary);
     font-size: 0.9rem;
     transition: all 0.2s;
+}
+
+.form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8rem center;
+    background-size: 1rem;
+    padding-right: 2.5rem;
+}
+
+.form-select option {
+    background-color: #0b0f19;
+    color: var(--text-primary);
 }
 
 .form-input:focus, .form-select:focus {

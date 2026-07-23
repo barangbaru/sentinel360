@@ -28,6 +28,8 @@ class Server(Base):
     cpu_usage = Column(Float, nullable=True)
     ram_usage = Column(Float, nullable=True)
     disk_usage = Column(Float, nullable=True)
+    ram_total = Column(Float, nullable=True)
+    disk_total = Column(Float, nullable=True)
 
     metrics = relationship("MetricHistory", back_populates="server", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="server", cascade="all, delete-orphan")

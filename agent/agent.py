@@ -6,7 +6,15 @@ import platform
 import logging
 import requests
 import psutil
+import threading
 from datetime import datetime
+
+try:
+    import pystray
+    from PIL import Image, ImageDraw
+    TRAY_AVAILABLE = True
+except ImportError:
+    TRAY_AVAILABLE = False
 
 # Setup Logging
 logging.basicConfig(
@@ -30,6 +38,13 @@ def get_default_config():
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         default = get_default_config()
+        # Try to look in the directory of the executable if running as compiled exe
+        exe_dir = os.path.dirname(sys.executable)
+        config_path = os.path.join(exe_dir, CONFIG_FILE)
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                return json.load(f)
+        
         with open(CONFIG_FILE, "w") as f:
             json.dump(default, f, indent=4)
         logger.info(f"Created default configuration file: {CONFIG_FILE}")
@@ -68,45 +83,51 @@ def get_uptime():
     return uptime_str
 
 def get_disk_partition():
-    # Detect main system partition
     if platform.system() == "Windows":
         return "C:\\"
     return "/"
 
-def main():
-    logger.info("Starting Sentinel360 Client Agent...")
-    config = load_config()
+def create_battery_icon(percent, plugged):
+    # Create a 64x64 transparent image
+    img = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
     
-    server_url = config.get("server_url", "http://localhost:8000").rstrip("/")
-    api_key = config.get("api_key", "YOUR_API_KEY_HERE")
-    interval = config.get("interval_seconds", 15)
+    # Battery body
+    draw.rounded_rectangle([10, 18, 48, 46], radius=5, outline=(255, 255, 255, 255), width=3)
+    # Battery tip
+    draw.rectangle([48, 27, 53, 37], fill=(255, 255, 255, 255))
     
-    if api_key == "YOUR_API_KEY_HERE":
-        logger.warning("Agent API Key is still default! Please edit agent_config.json with the correct key.")
+    # Fill based on percentage
+    fill_width = int(32 * (percent / 100))
+    if fill_width > 0:
+        if percent <= 20:
+            color = (239, 68, 68, 255) # Red
+        elif percent <= 50:
+            color = (245, 158, 11, 255) # Orange/Yellow
+        else:
+            color = (16, 185, 129, 255) # Green
+            
+        draw.rounded_rectangle([13, 21, 13 + fill_width, 43], radius=2, fill=color)
         
+    if plugged:
+        # Charging lightning bolt
+        draw.polygon([(26, 20), (32, 29), (27, 29), (30, 42), (22, 32), (27, 32)], fill=(255, 255, 0, 255))
+        
+    return img
+
+def report_loop(server_url, api_key, interval):
     report_url = f"{server_url}/api/agent/report"
-    
-    # Initialize network stats for speed calculation
     net_old = psutil.net_io_counters()
     time_old = time.time()
-    
-    # Give psutil.cpu_percent a warm up
     psutil.cpu_percent(interval=None)
-    
-    logger.info(f"Sentinel360 Server URL: {server_url}")
-    logger.info(f"Report Interval: {interval} seconds")
     
     while True:
         try:
-            # 1. CPU Usage
             cpu_usage = psutil.cpu_percent(interval=1)
-            
-            # 2. RAM Usage
             mem = psutil.virtual_memory()
             ram_usage = mem.percent
             ram_total_gb = mem.total / (1024**3)
             
-            # 3. Disk Usage (System Drive)
             part = get_disk_partition()
             try:
                 disk = psutil.disk_usage(part)
@@ -116,27 +137,20 @@ def main():
                 disk_usage = 0.0
                 disk_total_gb = 0.0
                 
-            # 4. Network I/O Speed
             net_new = psutil.net_io_counters()
             time_new = time.time()
-            
             elapsed = time_new - time_old
-            if elapsed <= 0:
-                elapsed = 1.0
-                
-            # Convert bytes to Kilobits per second (Kbps)
+            if elapsed <= 0: elapsed = 1.0
+            
             rx_speed = ((net_new.bytes_recv - net_old.bytes_recv) * 8) / (elapsed * 1024)
             tx_speed = ((net_new.bytes_sent - net_old.bytes_sent) * 8) / (elapsed * 1024)
             
-            # Save stats for next cycle
             net_old = net_new
             time_old = time_new
             
-            # 5. OS & Uptime
             os_info = get_os_info()
             uptime = get_uptime()
             
-            # Prepare payload
             payload = {
                 "cpu_usage": round(cpu_usage, 2),
                 "ram_usage": round(ram_usage, 2),
@@ -149,28 +163,87 @@ def main():
                 "uptime": uptime
             }
             
-            # Send report
             headers = {
                 "Content-Type": "application/json",
                 "X-Api-Key": api_key
             }
             
             logger.info(f"Sending metrics: CPU={payload['cpu_usage']}% RAM={payload['ram_usage']}% Disk={payload['disk_usage']}%")
-            
             response = requests.post(report_url, headers=headers, json=payload, timeout=5)
             if response.status_code == 200:
                 logger.info("Metrics reported successfully.")
             else:
-                logger.error(f"Failed to report metrics. Server responded with status: {response.status_code} - {response.text}")
-                
-        except requests.exceptions.RequestException as re:
-            logger.error(f"Connection error to Sentinel360 Server: {re}")
+                logger.error(f"Failed to report metrics: {response.status_code} - {response.text}")
         except Exception as e:
-            logger.error(f"Unexpected error in agent loop: {e}")
+            logger.error(f"Error in agent report loop: {e}")
             
-        # Sleep for the configured interval minus the 1 second block in cpu_percent
         sleep_time = max(1, interval - 1)
         time.sleep(sleep_time)
+
+def main():
+    logger.info("Starting Sentinel360 Client Agent...")
+    config = load_config()
+    
+    server_url = config.get("server_url", "http://localhost:8000").rstrip("/")
+    api_key = config.get("api_key", "YOUR_API_KEY_HERE")
+    interval = config.get("interval_seconds", 15)
+    
+    if api_key == "YOUR_API_KEY_HERE":
+        logger.warning("Agent API Key is still default!")
+        
+    # Check for --tray argument
+    use_tray = "--tray" in sys.argv
+    
+    if use_tray and TRAY_AVAILABLE:
+        # Start reporter loop in background thread
+        reporter_thread = threading.Thread(target=report_loop, args=(server_url, api_key, interval), daemon=True)
+        reporter_thread.start()
+        
+        # System Tray Exit Callback
+        def on_exit(icon, item):
+            icon.stop()
+            sys.exit(0)
+            
+        # Initial Battery Status
+        battery = psutil.sensors_battery()
+        pct = battery.percent if battery else 100
+        plugged = battery.power_plugged if battery else False
+        
+        # Create tray icon
+        global tray_icon
+        tray_icon = pystray.Icon(
+            "Sentinel360",
+            create_battery_icon(pct, plugged),
+            f"Sentinel360 Agent - Battery: {pct}%"
+        )
+        
+        # Update tray icon thread
+        def update_tray():
+            while True:
+                time.sleep(10)
+                bat = psutil.sensors_battery()
+                if bat:
+                    p = bat.percent
+                    pl = bat.power_plugged
+                    tray_icon.icon = create_battery_icon(p, pl)
+                    tray_icon.title = f"Sentinel360 Agent - Battery: {p}%"
+                    
+        update_thread = threading.Thread(target=update_tray, daemon=True)
+        update_thread.start()
+        
+        tray_icon.menu = pystray.Menu(
+            pystray.MenuItem("Sentinel360 Agent Running", lambda: None, enabled=False),
+            pystray.MenuItem(f"Host: {server_url}", lambda: None, enabled=False),
+            pystray.MenuItem("Exit", on_exit)
+        )
+        
+        logger.info("Running System Tray icon. Look at your Windows taskbar.")
+        tray_icon.run()
+    else:
+        if use_tray and not TRAY_AVAILABLE:
+            logger.warning("Tray libraries not available. Falling back to console mode.")
+        # Run report loop in main thread
+        report_loop(server_url, api_key, interval)
 
 if __name__ == "__main__":
     main()

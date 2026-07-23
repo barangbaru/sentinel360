@@ -26,6 +26,25 @@ from .scheduler import start_scheduler
 # Create the SQLite tables
 Base.metadata.create_all(bind=engine)
 
+# Add missing columns dynamically for SQLite if they don't exist
+db = SessionLocal()
+try:
+    from sqlalchemy import text
+    # Fetch column names
+    res = db.execute(text("PRAGMA table_info(servers)")).fetchall()
+    columns = [row[1] for row in res]
+    if "ram_total" not in columns:
+        db.execute(text("ALTER TABLE servers ADD COLUMN ram_total FLOAT"))
+        print("Migration: Added ram_total column to servers table.")
+    if "disk_total" not in columns:
+        db.execute(text("ALTER TABLE servers ADD COLUMN disk_total FLOAT"))
+        print("Migration: Added disk_total column to servers table.")
+    db.commit()
+except Exception as e:
+    print(f"Migration error: {e}")
+finally:
+    db.close()
+
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
@@ -375,6 +394,8 @@ def agent_report(
     server.cpu_usage = report.cpu_usage
     server.ram_usage = report.ram_usage
     server.disk_usage = report.disk_usage
+    server.ram_total = report.ram_total
+    server.disk_total = report.disk_total
     
     # Store metrics record
     metric = MetricHistory(

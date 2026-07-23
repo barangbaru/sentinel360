@@ -67,6 +67,14 @@
                     <span class="detail-header-label">Terakhir Dilihat</span>
                     <span id="detail-seen" class="detail-header-value">Loading...</span>
                 </div>
+                <div class="detail-header-item" id="detail-ram-container" style="display: none;">
+                    <span class="detail-header-label">Penggunaan RAM</span>
+                    <span id="detail-ram" class="detail-header-value">Loading...</span>
+                </div>
+                <div class="detail-header-item" id="detail-disk-container" style="display: none;">
+                    <span class="detail-header-label">Penggunaan Disk</span>
+                    <span id="detail-disk" class="detail-header-value">Loading...</span>
+                </div>
             </div>
 
             <!-- Agent API Key display if applicable -->
@@ -92,6 +100,9 @@
                     <option value="12" selected>12 Jam Terakhir</option>
                     <option value="24">24 Jam Terakhir</option>
                 </select>
+                <button id="export-csv-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    📥 Ekspor CSV
+                </button>
             </div>
         </div>
 

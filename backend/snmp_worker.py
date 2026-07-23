@@ -225,6 +225,8 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
     server.cpu_usage = avg_cpu
     server.ram_usage = ram_usage_pct
     server.disk_usage = disk_usage_pct
+    server.ram_total = ram_total_gb
+    server.disk_total = disk_total_gb
     
     metric = MetricHistory(
         server_id=server.id,

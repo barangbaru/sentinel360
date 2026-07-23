@@ -193,6 +193,20 @@ function initDashboard() {
                     return "normal";
                 };
 
+                let ramInfoStr = "";
+                if (ram !== null && server.ram_total) {
+                    const ramTotal = parseFloat(server.ram_total);
+                    const ramUsed = (ram / 100) * ramTotal;
+                    ramInfoStr = ` <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: normal;">(${ramUsed.toFixed(1)} GB / ${ramTotal.toFixed(1)} GB)</span>`;
+                }
+
+                let diskInfoStr = "";
+                if (disk !== null && server.disk_total) {
+                    const diskTotal = parseFloat(server.disk_total);
+                    const diskUsed = (disk / 100) * diskTotal;
+                    diskInfoStr = ` <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: normal;">(${diskUsed.toFixed(1)} GB / ${diskTotal.toFixed(1)} GB)</span>`;
+                }
+
                 metricsHtml = `
                     <div class="metric-bar-group">
                         ${cpu !== null ? `
@@ -209,7 +223,7 @@ function initDashboard() {
                         ${ram !== null ? `
                         <div>
                             <div class="metric-label-container">
-                                <span class="metric-label">RAM Usage</span>
+                                <span class="metric-label">RAM Usage${ramInfoStr}</span>
                                 <span class="metric-value">${ram}%</span>
                             </div>
                             <div class="progress-bar-bg">
@@ -220,7 +234,7 @@ function initDashboard() {
                         ${disk !== null ? `
                         <div>
                             <div class="metric-label-container">
-                                <span class="metric-label">Disk Space</span>
+                                <span class="metric-label">Disk Space${diskInfoStr}</span>
                                 <span class="metric-value">${disk}%</span>
                             </div>
                             <div class="progress-bar-bg">
@@ -430,6 +444,28 @@ function initDetailPage() {
             document.getElementById("detail-uptime").textContent = server.uptime || "N/A";
             document.getElementById("detail-seen").textContent = server.last_seen ? new Date(server.last_seen).toLocaleString() : "Never";
             
+            // Update RAM/Disk detailed metrics if available
+            const ramContainer = document.getElementById("detail-ram-container");
+            const diskContainer = document.getElementById("detail-disk-container");
+
+            if (server.ram_total && server.ram_usage !== null) {
+                const ramTotal = parseFloat(server.ram_total);
+                const ramUsed = (parseFloat(server.ram_usage) / 100) * ramTotal;
+                document.getElementById("detail-ram").innerHTML = `${ramUsed.toFixed(1)} GB / ${ramTotal.toFixed(1)} GB <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: normal;">(${Math.round(server.ram_usage)}%)</span>`;
+                if (ramContainer) ramContainer.style.display = "flex";
+            } else if (ramContainer) {
+                ramContainer.style.display = "none";
+            }
+
+            if (server.disk_total && server.disk_usage !== null) {
+                const diskTotal = parseFloat(server.disk_total);
+                const diskUsed = (parseFloat(server.disk_usage) / 100) * diskTotal;
+                document.getElementById("detail-disk").innerHTML = `${diskUsed.toFixed(1)} GB / ${diskTotal.toFixed(1)} GB <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: normal;">(${Math.round(server.disk_usage)}%)</span>`;
+                if (diskContainer) diskContainer.style.display = "flex";
+            } else if (diskContainer) {
+                diskContainer.style.display = "none";
+            }
+
             // Show token details if agent type
             const agentTokenSec = document.getElementById("agent-token-section");
             if (server.monitor_type === "agent" && agentTokenSec) {
@@ -641,6 +677,66 @@ function initDetailPage() {
     const rangeSelect = document.getElementById("range-select");
     if (rangeSelect) {
         rangeSelect.addEventListener("change", loadMetrics);
+    }
+
+    // Export CSV handler
+    const exportCsvBtn = document.getElementById("export-csv-btn");
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener("click", async () => {
+            const selectHours = document.getElementById("range-select")?.value || 12;
+            exportCsvBtn.disabled = true;
+            const originalText = exportCsvBtn.innerHTML;
+            exportCsvBtn.innerHTML = "Processing...";
+            try {
+                const res = await fetch(`/api/servers/${serverId}/metrics?hours=${selectHours}`);
+                if (!res.ok) throw new Error("Gagal mengambil data monitoring");
+                const metrics = await res.json();
+                
+                if (metrics.length === 0) {
+                    alert("Tidak ada data monitoring untuk rentang waktu ini.");
+                    return;
+                }
+                
+                // Format CSV Content (with BOM for Excel compatibility)
+                const headers = ["Waktu", "CPU Usage (%)", "RAM Usage (%)", "RAM Total (GB)", "Disk Usage (%)", "Disk Total (GB)", "Ping Latency (ms)", "Net RX (Kbps)", "Net TX (Kbps)"];
+                const csvRows = [headers.join(",")];
+                
+                metrics.forEach(m => {
+                    const timeStr = new Date(m.timestamp).toLocaleString();
+                    const row = [
+                        `"${timeStr}"`,
+                        m.cpu_usage !== null ? m.cpu_usage.toFixed(1) : "",
+                        m.ram_usage !== null ? m.ram_usage.toFixed(1) : "",
+                        m.ram_total !== null ? m.ram_total.toFixed(1) : "",
+                        m.disk_usage !== null ? m.disk_usage.toFixed(1) : "",
+                        m.disk_total !== null ? m.disk_total.toFixed(1) : "",
+                        m.latency !== null ? m.latency.toFixed(1) : "",
+                        m.network_rx !== null ? m.network_rx.toFixed(1) : "",
+                        m.network_tx !== null ? m.network_tx.toFixed(1) : ""
+                    ];
+                    csvRows.push(row.join(","));
+                });
+                
+                const csvString = csvRows.join("\r\n");
+                const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;\uFEFF" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                
+                const serverName = document.getElementById("detail-name")?.textContent || "server";
+                const cleanName = serverName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                link.setAttribute("download", `monitoring_${cleanName}_${selectHours}j.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                alert("Error mengekspor data: " + error.message);
+            } finally {
+                exportCsvBtn.disabled = false;
+                exportCsvBtn.innerHTML = originalText;
+            }
+        });
     }
 
     // Initial load and start poll

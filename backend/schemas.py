@@ -23,6 +23,8 @@ class ServerResponse(ServerBase):
     cpu_usage: Optional[float] = None
     ram_usage: Optional[float] = None
     disk_usage: Optional[float] = None
+    ram_total: Optional[float] = None
+    disk_total: Optional[float] = None
 
     class Config:
         from_attributes = True
