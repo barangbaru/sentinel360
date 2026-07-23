@@ -33,6 +33,12 @@
                 Ganti Password
             </button>
             
+            {% if role == 'admin' %}
+            <button id="settings-alarm-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                ⚙️ Pengaturan Alarm
+            </button>
+            {% endif %}
+            
             <a href="/logout" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; text-decoration: none;">
                 Keluar
             </a>
@@ -210,6 +216,139 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Simpan Password</button>
+            </div>
+        </form>
+    </dialog>
+
+    <style>
+        /* Switch toggle slider styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            transition: .3s;
+            border-radius: 34px;
+            border: 1px solid var(--border-color);
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #cbd5e1;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        .switch input:checked + .slider {
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+        .switch input:checked + .slider:before {
+            transform: translateX(20px);
+            background-color: white;
+        }
+    </style>
+
+    <dialog id="alarm-settings-modal" style="width: 500px; max-width: 90%; max-height: 85vh; overflow-y: auto;">
+        <div class="modal-header">
+            <h3 class="modal-title">⚙️ Pengaturan Notifikasi Alarm</h3>
+            <button class="modal-close" id="cancel-alarm-settings-btn">&times;</button>
+        </div>
+        <form id="alarm-settings-form">
+            <!-- Telegram Section -->
+            <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: rgba(255, 255, 255, 0.01);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4 style="margin: 0; color: var(--accent); display: flex; align-items: center; gap: 0.25rem;">📱 Telegram Bot</h4>
+                    <label class="switch">
+                        <input type="checkbox" id="telegram_enabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="telegram_bot_token" class="form-label">Telegram Bot Token</label>
+                    <input type="password" id="telegram_bot_token" class="form-input" placeholder="Bot Token dari @BotFather">
+                </div>
+                <div class="form-group">
+                    <label for="telegram_chat_id" class="form-label">Telegram Chat ID</label>
+                    <input type="text" id="telegram_chat_id" class="form-input" placeholder="Chat ID (e.g. -100123456789)">
+                </div>
+            </div>
+
+            <!-- WhatsApp Webhook Section -->
+            <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: rgba(255, 255, 255, 0.01);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4 style="margin: 0; color: var(--accent); display: flex; align-items: center; gap: 0.25rem;">💬 WhatsApp Webhook</h4>
+                    <label class="switch">
+                        <input type="checkbox" id="whatsapp_enabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="whatsapp_webhook_url" class="form-label">Webhook URL</label>
+                    <input type="url" id="whatsapp_webhook_url" class="form-input" placeholder="https://api.whatsapp-gateway.com/send">
+                </div>
+                <div class="form-group">
+                    <label for="whatsapp_token" class="form-label">Auth Token (Optional)</label>
+                    <input type="password" id="whatsapp_token" class="form-input" placeholder="API Key / Token Auth">
+                </div>
+            </div>
+
+            <!-- SMTP Email Section -->
+            <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; background: rgba(255, 255, 255, 0.01);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4 style="margin: 0; color: var(--accent); display: flex; align-items: center; gap: 0.25rem;">✉️ SMTP Email</h4>
+                    <label class="switch">
+                        <input type="checkbox" id="smtp_enabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 0.5rem;">
+                    <div class="form-group">
+                        <label for="smtp_host" class="form-label">SMTP Host</label>
+                        <input type="text" id="smtp_host" class="form-input" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="smtp_port" class="form-label">Port</label>
+                        <input type="number" id="smtp_port" class="form-input" placeholder="587">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="smtp_username" class="form-label">Username / Email</label>
+                    <input type="text" id="smtp_username" class="form-input" placeholder="nama@gmail.com">
+                </div>
+                <div class="form-group">
+                    <label for="smtp_password" class="form-label">Password</label>
+                    <input type="password" id="smtp_password" class="form-input" placeholder="Password Aplikasi SMTP">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <div class="form-group">
+                        <label for="smtp_sender" class="form-label">Pengirim</label>
+                        <input type="email" id="smtp_sender" class="form-input" placeholder="sender@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="smtp_recipient" class="form-label">Penerima</label>
+                        <input type="email" id="smtp_recipient" class="form-input" placeholder="recipient@gmail.com">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="display: flex; gap: 0.5rem; justify-content: space-between; align-items: center;">
+                <button type="button" id="test-alarm-btn" class="btn btn-secondary" style="border-color: var(--accent); color: var(--accent); padding: 0.5rem 0.75rem; font-size: 0.8rem;">🧪 Test Kirim</button>
+                <button type="submit" class="btn btn-primary">Simpan Pengaturan</button>
             </div>
         </form>
     </dialog>

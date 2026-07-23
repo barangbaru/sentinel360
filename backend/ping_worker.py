@@ -106,14 +106,19 @@ def ping_server(db: Session, server: Server):
     # Handle Alerts
     if was_online and not is_online:
         # Server went offline, create alert
+        alert_msg = f"Server {server.name} ({server.ip_address}) is OFFLINE (Ping failed)"
         alert = Alert(
             server_id=server.id,
             timestamp=datetime.utcnow(),
-            message=f"Server {server.name} ({server.ip_address}) is OFFLINE (Ping failed)",
+            message=alert_msg,
             resolved=False
         )
         db.add(alert)
         logger.warning(f"ALERT: Server {server.name} ({server.ip_address}) went offline!")
+        
+        # Send alert
+        from .notifications import send_alert_notification
+        send_alert_notification(db, alert_msg)
         
     elif not was_online and is_online and server.status != "unknown":
         # Server came back online, resolve active alerts
@@ -125,6 +130,10 @@ def ping_server(db: Session, server: Server):
             alert.resolved = True
             alert.resolved_at = datetime.utcnow()
         logger.info(f"Server {server.name} ({server.ip_address}) came back online. Resolved active alerts.")
+        
+        # Send resolution alert
+        from .notifications import send_alert_notification
+        send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE")
 
     db.commit()
     db.refresh(server)

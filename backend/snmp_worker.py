@@ -136,14 +136,17 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
         
         # Handle alert
         if was_online:
+            alert_msg = f"Server {server.name} ({server.ip_address}) is OFFLINE (SNMP query failed)"
             alert = Alert(
                 server_id=server.id,
                 timestamp=datetime.utcnow(),
-                message=f"Server {server.name} ({server.ip_address}) is OFFLINE (SNMP query failed)",
+                message=alert_msg,
                 resolved=False
             )
             db.add(alert)
             logger.warning(f"ALERT: SNMP Server {server.name} went offline.")
+            from .notifications import send_alert_notification
+            send_alert_notification(db, alert_msg)
         
         db.commit()
         return False
@@ -249,6 +252,8 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
             alert.resolved = True
             alert.resolved_at = datetime.utcnow()
         logger.info(f"SNMP Server {server.name} came back online. Resolved active alerts.")
+        from .notifications import send_alert_notification
+        send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE")
         
     # Check threshold alerts (e.g. CPU/RAM > 90%)
     if avg_cpu and avg_cpu > 90.0:
@@ -256,29 +261,35 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
         existing_cpu_alert = db.query(Alert).filter(
             Alert.server_id == server.id,
             Alert.resolved == False,
-            Alert.message.like("%CPU usage exceeds%")
+            Alert.message.like("%CPU usage exceeds%") | Alert.message.like("High CPU usage%")
         ).first()
         if not existing_cpu_alert:
+            msg = f"High CPU usage on {server.name}: {avg_cpu:.1f}%"
             db.add(Alert(
                 server_id=server.id,
                 timestamp=datetime.utcnow(),
-                message=f"High CPU usage on {server.name}: {avg_cpu:.1f}%",
+                message=msg,
                 resolved=False
             ))
+            from .notifications import send_alert_notification
+            send_alert_notification(db, msg)
             
     if ram_usage_pct and ram_usage_pct > 90.0:
         existing_ram_alert = db.query(Alert).filter(
             Alert.server_id == server.id,
             Alert.resolved == False,
-            Alert.message.like("%RAM usage exceeds%")
+            Alert.message.like("%RAM usage exceeds%") | Alert.message.like("High RAM usage%")
         ).first()
         if not existing_ram_alert:
+            msg = f"High RAM usage on {server.name}: {ram_usage_pct:.1f}%"
             db.add(Alert(
                 server_id=server.id,
                 timestamp=datetime.utcnow(),
-                message=f"High RAM usage on {server.name}: {ram_usage_pct:.1f}%",
+                message=msg,
                 resolved=False
             ))
+            from .notifications import send_alert_notification
+            send_alert_notification(db, msg)
 
     db.commit()
     db.refresh(server)

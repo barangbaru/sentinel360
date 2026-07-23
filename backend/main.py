@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from .database import engine, get_db, Base, SessionLocal
-from .models import Server, MetricHistory, Alert, User, Website
+from .models import Server, MetricHistory, Alert, User, Website, SystemSettings
 from .schemas import (
     ServerCreate,
     ServerResponse,
@@ -23,7 +23,9 @@ from .schemas import (
     PublicServerResponse,
     WebsiteCreate,
     WebsiteResponse,
-    PublicWebsiteResponse
+    PublicWebsiteResponse,
+    SystemSettingsResponse,
+    SystemSettingsUpdate
 )
 from .scheduler import start_scheduler
 
@@ -34,6 +36,7 @@ Base.metadata.create_all(bind=engine)
 db = SessionLocal()
 try:
     from sqlalchemy import text
+    from .models import SystemSettings
     # Fetch column names
     res = db.execute(text("PRAGMA table_info(servers)")).fetchall()
     columns = [row[1] for row in res]
@@ -43,6 +46,22 @@ try:
     if "disk_total" not in columns:
         db.execute(text("ALTER TABLE servers ADD COLUMN disk_total FLOAT"))
         print("Migration: Added disk_total column to servers table.")
+        
+    res_alerts = db.execute(text("PRAGMA table_info(alerts)")).fetchall()
+    alerts_cols = [row[1] for row in res_alerts]
+    if "website_id" not in alerts_cols:
+        db.execute(text("ALTER TABLE alerts ADD COLUMN website_id INTEGER"))
+        print("Migration: Added website_id column to alerts table.")
+    if "resolved_at" not in alerts_cols:
+        db.execute(text("ALTER TABLE alerts ADD COLUMN resolved_at DATETIME"))
+        print("Migration: Added resolved_at column to alerts table.")
+        
+    # Seed default system settings
+    settings = db.query(SystemSettings).first()
+    if not settings:
+        settings = SystemSettings()
+        db.add(settings)
+        print("Initial System Settings seeded.")
     db.commit()
 except Exception as e:
     print(f"Migration error: {e}")
@@ -497,6 +516,8 @@ def agent_report(
         for alert in active_offline_alerts:
             alert.resolved = True
             alert.resolved_at = datetime.utcnow()
+        from .notifications import send_alert_notification
+        send_alert_notification(db, f"Agent on {server.name} ({server.ip_address}) came back ONLINE")
             
     # Check threshold alerts (e.g. CPU > 90%)
     if report.cpu_usage > 90.0:
@@ -506,12 +527,15 @@ def agent_report(
             Alert.message.like("High CPU usage%")
         ).first()
         if not existing_cpu:
+            msg = f"High CPU usage on {server.name}: {report.cpu_usage:.1f}%"
             db.add(Alert(
                 server_id=server.id,
                 timestamp=datetime.utcnow(),
-                message=f"High CPU usage on {server.name}: {report.cpu_usage:.1f}%",
+                message=msg,
                 resolved=False
             ))
+            from .notifications import send_alert_notification
+            send_alert_notification(db, msg)
             
     if report.ram_usage > 90.0:
         existing_ram = db.query(Alert).filter(
@@ -520,12 +544,67 @@ def agent_report(
             Alert.message.like("High RAM usage%")
         ).first()
         if not existing_ram:
+            msg = f"High RAM usage on {server.name}: {report.ram_usage:.1f}%"
             db.add(Alert(
                 server_id=server.id,
                 timestamp=datetime.utcnow(),
-                message=f"High RAM usage on {server.name}: {report.ram_usage:.1f}%",
+                message=msg,
                 resolved=False
             ))
+            from .notifications import send_alert_notification
+            send_alert_notification(db, msg)
             
     db.commit()
     return {"status": "ok", "message": "Metrics received successfully."}
+
+@app.get("/api/settings", response_model=SystemSettingsResponse)
+def get_system_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    """
+    Get system alarm/notification settings.
+    """
+    settings = db.query(SystemSettings).first()
+    if not settings:
+        settings = SystemSettings()
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    return settings
+
+@app.put("/api/settings", response_model=SystemSettingsResponse)
+def update_system_settings(
+    payload: SystemSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    """
+    Update system alarm/notification settings.
+    """
+    settings = db.query(SystemSettings).first()
+    if not settings:
+        settings = SystemSettings()
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+        
+    for field, val in payload.model_dump().items():
+        setattr(settings, field, val)
+        
+    db.commit()
+    db.refresh(settings)
+    return settings
+
+@app.post("/api/settings/test")
+def test_system_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    """
+    Sends a test alarm message to all enabled pathways.
+    """
+    from .notifications import send_alert_notification
+    test_msg = "Ini adalah notifikasi uji coba dari Sentinel360 Monitoring!"
+    send_alert_notification(db, test_msg)
+    return {"status": "ok", "message": "Test message sent to enabled channels."}

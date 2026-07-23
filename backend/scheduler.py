@@ -76,6 +76,10 @@ def scheduler_loop():
                                 db.add(alert)
                                 logger.warning(f"ALERT: {alert_msg}")
                                 
+                                # Send alert
+                                from .notifications import send_alert_notification
+                                send_alert_notification(db, alert_msg)
+                                
                         db.commit()
 
             # Polling website status by URL

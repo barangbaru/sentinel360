@@ -56,11 +56,15 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False)
+    server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=True)
+    website_id = Column(Integer, ForeignKey("websites.id", ondelete="CASCADE"), nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
     message = Column(String, nullable=False)
     resolved = Column(Boolean, default=False)
+    resolved_at = Column(DateTime, nullable=True)
+
     server = relationship("Server", back_populates="alerts")
+    website = relationship("Website", backref="alerts")
 
 class User(Base):
     __tablename__ = "users"
@@ -85,3 +89,26 @@ class Website(Base):
     ssl_days_left = Column(Integer, nullable=True)
     last_checked = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
+
+class SystemSettings(Base):
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # SMTP Settings
+    smtp_enabled = Column(Boolean, default=False)
+    smtp_host = Column(String, nullable=True)
+    smtp_port = Column(Integer, default=587)
+    smtp_username = Column(String, nullable=True)
+    smtp_password = Column(String, nullable=True)
+    smtp_sender = Column(String, nullable=True)
+    smtp_recipient = Column(String, nullable=True)
+    
+    # Telegram Settings
+    telegram_enabled = Column(Boolean, default=False)
+    telegram_bot_token = Column(String, nullable=True)
+    telegram_chat_id = Column(String, nullable=True)
+    
+    # WhatsApp Settings
+    whatsapp_enabled = Column(Boolean, default=False)
+    whatsapp_webhook_url = Column(String, nullable=True)
+    whatsapp_token = Column(String, nullable=True)

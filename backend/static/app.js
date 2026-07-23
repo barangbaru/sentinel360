@@ -499,6 +499,134 @@ function initDashboard() {
     if (addWebsiteBtn && typeof USER_ROLE !== "undefined" && USER_ROLE === "view") {
         addWebsiteBtn.style.display = "none";
     }
+    // Alarm Settings Modal Elements
+    const alarmSettingsBtn = document.getElementById("settings-alarm-btn");
+    const alarmSettingsModal = document.getElementById("alarm-settings-modal");
+    const alarmSettingsForm = document.getElementById("alarm-settings-form");
+    const cancelAlarmSettingsBtn = document.getElementById("cancel-alarm-settings-btn");
+    const testAlarmBtn = document.getElementById("test-alarm-btn");
+
+    if (alarmSettingsBtn && alarmSettingsModal) {
+        alarmSettingsBtn.addEventListener("click", async () => {
+            try {
+                const res = await fetch("/api/settings");
+                if (res.status === 401) {
+                    window.location.href = "/login";
+                    return;
+                }
+                if (!res.ok) throw new Error("Gagal mengambil data pengaturan alarm.");
+                const settings = await res.json();
+                
+                document.getElementById("telegram_enabled").checked = settings.telegram_enabled;
+                document.getElementById("telegram_bot_token").value = settings.telegram_bot_token || "";
+                document.getElementById("telegram_chat_id").value = settings.telegram_chat_id || "";
+                
+                document.getElementById("whatsapp_enabled").checked = settings.whatsapp_enabled;
+                document.getElementById("whatsapp_webhook_url").value = settings.whatsapp_webhook_url || "";
+                document.getElementById("whatsapp_token").value = settings.whatsapp_token || "";
+                
+                document.getElementById("smtp_enabled").checked = settings.smtp_enabled;
+                document.getElementById("smtp_host").value = settings.smtp_host || "";
+                document.getElementById("smtp_port").value = settings.smtp_port || 587;
+                document.getElementById("smtp_username").value = settings.smtp_username || "";
+                document.getElementById("smtp_password").value = settings.smtp_password || "";
+                document.getElementById("smtp_sender").value = settings.smtp_sender || "";
+                document.getElementById("smtp_recipient").value = settings.smtp_recipient || "";
+                
+                alarmSettingsModal.showModal();
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
+    }
+
+    if (cancelAlarmSettingsBtn && alarmSettingsModal) {
+        cancelAlarmSettingsBtn.addEventListener("click", () => {
+            alarmSettingsModal.close();
+        });
+    }
+
+    if (alarmSettingsForm && alarmSettingsModal) {
+        alarmSettingsForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const payload = {
+                telegram_enabled: document.getElementById("telegram_enabled").checked,
+                telegram_bot_token: document.getElementById("telegram_bot_token").value || null,
+                telegram_chat_id: document.getElementById("telegram_chat_id").value || null,
+                
+                whatsapp_enabled: document.getElementById("whatsapp_enabled").checked,
+                whatsapp_webhook_url: document.getElementById("whatsapp_webhook_url").value || null,
+                whatsapp_token: document.getElementById("whatsapp_token").value || null,
+                
+                smtp_enabled: document.getElementById("smtp_enabled").checked,
+                smtp_host: document.getElementById("smtp_host").value || null,
+                smtp_port: parseInt(document.getElementById("smtp_port").value, 10) || 587,
+                smtp_username: document.getElementById("smtp_username").value || null,
+                smtp_password: document.getElementById("smtp_password").value || null,
+                smtp_sender: document.getElementById("smtp_sender").value || null,
+                smtp_recipient: document.getElementById("smtp_recipient").value || null
+            };
+            
+            try {
+                const res = await fetch("/api/settings", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error("Gagal menyimpan pengaturan alarm.");
+                
+                alarmSettingsModal.close();
+                alert("Pengaturan alarm berhasil disimpan!");
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
+    }
+
+    if (testAlarmBtn) {
+        testAlarmBtn.addEventListener("click", async () => {
+            testAlarmBtn.disabled = true;
+            const originalText = testAlarmBtn.textContent;
+            testAlarmBtn.textContent = "Mengirim...";
+            try {
+                const payload = {
+                    telegram_enabled: document.getElementById("telegram_enabled").checked,
+                    telegram_bot_token: document.getElementById("telegram_bot_token").value || null,
+                    telegram_chat_id: document.getElementById("telegram_chat_id").value || null,
+                    
+                    whatsapp_enabled: document.getElementById("whatsapp_enabled").checked,
+                    whatsapp_webhook_url: document.getElementById("whatsapp_webhook_url").value || null,
+                    whatsapp_token: document.getElementById("whatsapp_token").value || null,
+                    
+                    smtp_enabled: document.getElementById("smtp_enabled").checked,
+                    smtp_host: document.getElementById("smtp_host").value || null,
+                    smtp_port: parseInt(document.getElementById("smtp_port").value, 10) || 587,
+                    smtp_username: document.getElementById("smtp_username").value || null,
+                    smtp_password: document.getElementById("smtp_password").value || null,
+                    smtp_sender: document.getElementById("smtp_sender").value || null,
+                    smtp_recipient: document.getElementById("smtp_recipient").value || null
+                };
+                
+                const saveRes = await fetch("/api/settings", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!saveRes.ok) throw new Error("Gagal menyimpan pengaturan sebelum uji coba.");
+
+                const res = await fetch("/api/settings/test", { method: "POST" });
+                if (!res.ok) throw new Error("Gagal mengirim notifikasi uji coba.");
+                alert("Notifikasi uji coba berhasil dikirim ke saluran yang aktif!");
+            } catch (error) {
+                alert("Error: " + error.message);
+            } finally {
+                testAlarmBtn.disabled = false;
+                testAlarmBtn.textContent = originalText;
+            }
+        });
+    }
+
     const addWebModal = document.getElementById("add-website-modal");
     const addWebForm = document.getElementById("add-website-form");
     const cancelWebModalBtn = document.getElementById("cancel-website-modal-btn");

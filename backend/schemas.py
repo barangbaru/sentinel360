@@ -65,7 +65,8 @@ class MetricHistoryResponse(BaseModel):
 
 class AlertResponse(BaseModel):
     id: int
-    server_id: int
+    server_id: Optional[int] = None
+    website_id: Optional[int] = None
     timestamp: datetime
     message: str
     resolved: bool
@@ -119,3 +120,29 @@ class PublicWebsiteResponse(WebsiteBase):
 
     class Config:
         from_attributes = True
+
+class SystemSettingsBase(BaseModel):
+    smtp_enabled: bool = False
+    smtp_host: Optional[str] = None
+    smtp_port: int = 587
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_sender: Optional[str] = None
+    smtp_recipient: Optional[str] = None
+    
+    telegram_enabled: bool = False
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    
+    whatsapp_enabled: bool = False
+    whatsapp_webhook_url: Optional[str] = None
+    whatsapp_token: Optional[str] = None
+
+class SystemSettingsResponse(SystemSettingsBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class SystemSettingsUpdate(SystemSettingsBase):
+    pass

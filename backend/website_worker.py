@@ -34,6 +34,7 @@ def get_ssl_expiry_date(url: str):
         return None, f"SSL check error: {str(e)}"
 
 def check_website(db, website):
+    was_online = website.status == "online"
     url = website.url
     start_time = time.time()
     
@@ -87,4 +88,32 @@ def check_website(db, website):
         website.ssl_days_left = None
 
     website.last_checked = datetime.utcnow()
+    
+    # Handle Alerts
+    is_online = website.status == "online"
+    from .models import Alert
+    
+    if was_online and not is_online:
+        alert_msg = f"Website {website.name} ({website.url}) is OFFLINE (HTTP: {website.status_code or 'FAIL'})"
+        alert = Alert(
+            website_id=website.id,
+            timestamp=datetime.utcnow(),
+            message=alert_msg,
+            resolved=False
+        )
+        db.add(alert)
+        from .notifications import send_alert_notification
+        send_alert_notification(db, alert_msg)
+        
+    elif not was_online and is_online and website.status != "unknown":
+        active_alerts = db.query(Alert).filter(
+            Alert.website_id == website.id,
+            Alert.resolved == False
+        ).all()
+        for alert in active_alerts:
+            alert.resolved = True
+            alert.resolved_at = datetime.utcnow()
+        from .notifications import send_alert_notification
+        send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE")
+        
     db.commit()
