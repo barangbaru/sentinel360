@@ -36,57 +36,44 @@ $intervalInput = Read-Host "Masukkan interval pelaporan metrik dalam detik (defa
 if ([string]::IsNullOrWhiteSpace($intervalInput)) { $intervalInput = $defaultInterval }
 $interval = [int]$intervalInput
 
-# 3. Cek Python
-Write-Host ""; Write-Host "[1/5] Memeriksa instalasi Python..." -ForegroundColor Cyan
-$pythonPath = Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-if (-not $pythonPath) {
-    Write-Host "Python tidak ditemukan di PATH. Mencoba menginstal Python menggunakan winget..." -ForegroundColor Yellow
-    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-    if ($winget) {
-        # Jalankan winget installer untuk Python
-        Start-Process winget -ArgumentList "install --id Python.Python.3 --silent --accept-source-agreements --accept-package-agreements" -NoNewWindow -Wait
-        # Refresh PATH
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-        $pythonPath = Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-    }
-}
+# 3. Deteksi Arsitektur & Tentukan File Executable
+Write-Host ""; Write-Host "[1/4] Mendeteksi arsitektur sistem..." -ForegroundColor Cyan
+$is64Bit = [Environment]::Is64BitOperatingSystem
+$exeName = if ($is64Bit) { "Sentinel360Agent_64bit.exe" } else { "Sentinel360Agent_32bit.exe" }
+$archText = if ($is64Bit) { "64-bit (x64)" } else { "32-bit (x86)" }
+Write-Host "Arsitektur Sistem: $archText" -ForegroundColor Green
+Write-Host "Executable target: $exeName" -ForegroundColor Green
 
-if (-not $pythonPath) {
-    Write-Error "Python tidak ditemukan dan gagal diinstal otomatis. Harap unduh dan instal Python 3 dari https://www.python.org/downloads/ (pastikan mencentang 'Add Python to PATH') lalu jalankan kembali script ini."
-    Read-Host "Tekan Enter untuk keluar..."
-    Exit 1
-}
-
-$pythonwPath = $pythonPath -replace 'python.exe$', 'pythonw.exe'
-Write-Host "Menggunakan Python: $pythonPath" -ForegroundColor Green
-
-# 4. Siapkan Direktori & Unduh berkas
-Write-Host ""; Write-Host "[2/5] Menyiapkan direktori & mengunduh agent..." -ForegroundColor Cyan
+# 4. Siapkan Direktori & Salin Executable
+Write-Host ""; Write-Host "[2/4] Menyiapkan direktori & menyalin executable..." -ForegroundColor Cyan
 $installDir = "C:\SentinelAgent"
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 }
 
-$rawAgentUrl = "https://raw.githubusercontent.com/barangbaru/sentinel360/main/agent/agent.py"
-Write-Host "Mengunduh agent.py..." -ForegroundColor Gray
-try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $rawAgentUrl -OutFile "$installDir\agent.py" -UseBasicParsing
-} catch {
-    Write-Warning "Gagal mengunduh agent.py secara online. Mencoba menyalin berkas lokal jika ada..."
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-    if (Test-Path "$scriptDir\agent.py") {
-        Copy-Item "$scriptDir\agent.py" "$installDir\agent.py" -Force
-        Write-Host "Berhasil menyalin agent.py dari direktori lokal." -ForegroundColor Green
-    } else {
-        Write-Error "File agent.py tidak ditemukan! Proses instalasi dibatalkan."
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$sourceExe = Join-Path $scriptDir $exeName
+$targetExe = Join-Path $installDir "Sentinel360Agent.exe"
+
+if (Test-Path $sourceExe) {
+    Copy-Item $sourceExe $targetExe -Force
+    Write-Host "Berhasil menyalin $exeName ke $targetExe" -ForegroundColor Green
+} else {
+    Write-Host "$exeName tidak ditemukan secara lokal. Mencoba mengunduh dari GitHub..." -ForegroundColor Yellow
+    $rawAgentUrl = "https://raw.githubusercontent.com/barangbaru/sentinel360/main/agent/$exeName"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $rawAgentUrl -OutFile $targetExe -UseBasicParsing
+        Write-Host "Berhasil mengunduh $exeName dari GitHub." -ForegroundColor Green
+    } catch {
+        Write-Error "File executable agent tidak ditemukan secara lokal maupun di GitHub repo! Proses instalasi dibatalkan."
         Read-Host "Tekan Enter untuk keluar..."
         Exit 1
     }
 }
 
 # 5. Buat konfigurasi agent_config.json
-Write-Host ""; Write-Host "[3/5] Membuat file konfigurasi..." -ForegroundColor Cyan
+Write-Host ""; Write-Host "[3/4] Membuat file konfigurasi..." -ForegroundColor Cyan
 $config = @{
     server_url = $hostUrl
     api_key = $apiKey
@@ -96,14 +83,8 @@ $configJson = $config | ConvertTo-Json
 Set-Content -Path "$installDir\agent_config.json" -Value $configJson
 Write-Host "Konfigurasi disimpan di $installDir\agent_config.json" -ForegroundColor Green
 
-# 6. Install dependensi python
-Write-Host ""; Write-Host "[4/5] Menginstal dependensi python (psutil, requests)..." -ForegroundColor Cyan
-Start-Process $pythonPath -ArgumentList "-m pip install --upgrade pip --quiet" -NoNewWindow -Wait
-Start-Process $pythonPath -ArgumentList "-m pip install psutil requests --quiet" -NoNewWindow -Wait
-Write-Host "Dependensi terpasang." -ForegroundColor Green
-
-# 7. Daftarkan sebagai Task Scheduler (berjalan di background)
-Write-Host ""; Write-Host "[5/5] Mendaftarkan Agent ke Task Scheduler Windows..." -ForegroundColor Cyan
+# 6. Daftarkan sebagai Task Scheduler (berjalan di background)
+Write-Host ""; Write-Host "[4/4] Mendaftarkan Agent ke Task Scheduler Windows..." -ForegroundColor Cyan
 $taskName = "Sentinel360Agent"
 
 # Hapus task lama jika ada
@@ -111,7 +92,7 @@ Register-ScheduledTask -TaskName $taskName -Action (New-ScheduledTaskAction -Exe
 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 
 # Buat task baru
-$action = New-ScheduledTaskAction -Execute $pythonwPath -Argument "$installDir\agent.py" -WorkingDirectory $installDir
+$action = New-ScheduledTaskAction -Execute $targetExe -WorkingDirectory $installDir
 $trigger = New-ScheduledTaskTrigger -AtStartup
 # Jalankan sebagai SYSTEM agar berjalan di background tanpa jendela console
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
@@ -123,7 +104,7 @@ Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Pr
 Start-ScheduledTask -TaskName $taskName
 Write-Host "Task Scheduler $taskName berhasil didaftarkan dan dijalankan." -ForegroundColor Green
 
-# 8. Ringkasan
+# 7. Ringkasan
 Write-Output ""
 Write-Host "==================================================" -ForegroundColor Green
 Write-Host "      ✓ INSTALASI AGENT WINDOWS SELESAI           " -ForegroundColor Green
@@ -133,6 +114,7 @@ Write-Output "  Sentinel360 Server : $hostUrl"
 Write-Output "  API Key            : $apiKey"
 Write-Output "  Interval Laporan   : $interval detik"
 Write-Output "  Direktori Kerja    : $installDir"
+Write-Output "  Executable Agent   : $targetExe"
 Write-Output "  Nama Task Windows  : $taskName"
 Write-Output ""
 Write-Host "Agent sekarang berjalan secara background sebagai Task Windows." -ForegroundColor Yellow
