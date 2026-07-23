@@ -263,6 +263,7 @@ success "Kode berhasil diperbarui."
 # ════════════════════════════════════════════════════════════════════════════
 header "[3/7] Update virtual environment"
 cd "$APP_DIR"
+rm -rf venv
 python3 -m venv venv
 venv/bin/pip install --upgrade pip -q
 
