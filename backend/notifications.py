@@ -41,6 +41,8 @@ def send_alert_notification(db: Session, message: str):
             import urllib.parse
             headers = {"Content-Type": "application/json"}
             if settings.whatsapp_token:
+                headers["key"] = settings.whatsapp_token
+                headers["api_key"] = settings.whatsapp_token
                 headers["Authorization"] = f"Bearer {settings.whatsapp_token}"
             
             # Format base URL for Open WA if session id is specified
