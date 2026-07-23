@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel360 | NOC Display Wallboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%22100%%22 height=%22100%%22><rect width=%22100%%22 height=%22100%%22 fill=%22%236366f1%22 rx=%228%22/><text x=%2250%%22 y=%2250%%22 font-family=%22sans-serif%22 font-weight=%22bold%22 font-size=%2216%22 fill=%22white%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>S360</text></svg>">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            background-color: #030712 !important;
+            padding: 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .wallboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .header-title-sec {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .wallboard-title {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .display-clock {
+            font-family: monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        /* Statistics counters */
+        .summary-stats {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .stat-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .stat-pill.online {
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.05);
+            color: var(--online);
+        }
+
+        .stat-pill.offline {
+            border-color: rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.05);
+            color: var(--offline);
+        }
+
+        /* High-density grid */
+        .tv-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.75rem;
+            flex-grow: 1;
+        }
+
+        /* Compact server card */
+        .tv-card {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: border-color 0.2s, transform 0.2s;
+            position: relative;
+            overflow: hidden;
+            height: 175px; /* Fixed height for clean grid layout */
+        }
+
+        .tv-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--unknown);
+        }
+
+        .tv-card.status-online::before { background: var(--online); }
+        .tv-card.status-offline::before { background: var(--offline); }
+
+        .tv-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.4rem;
+        }
+
+        .tv-server-name {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 170px;
+        }
+
+        .tv-server-ip {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .tv-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-online .tv-status-dot {
+            background: var(--online);
+            box-shadow: 0 0 8px var(--online);
+        }
+
+        .status-offline .tv-status-dot {
+            background: var(--offline);
+            box-shadow: 0 0 8px var(--offline);
+        }
+
+        /* Compact metrics */
+        .tv-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-top: 0.2rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .tv-metric-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
+        .tv-metric-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .tv-metric-val {
+            color: var(--text-primary);
+        }
+
+        .tv-progress-bg {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .tv-progress-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.5s;
+        }
+
+        .tv-progress-fill.normal { background: var(--online); }
+        .tv-progress-fill.warning { background: var(--warning); }
+        .tv-progress-fill.danger { background: var(--offline); }
+
+        .tv-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 0.4rem;
+            margin-top: 0.2rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .tv-badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+
+        /* Overlay for no servers */
+        .tv-empty {
+            grid-column: 1/-1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            padding: 4rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="wallboard-header">
+        <div class="header-title-sec">
+            <div class="logo-icon" style="width: 1.8rem; height: 1.8rem; font-size: 0.9rem;">S</div>
+            <span class="wallboard-title">SENTINEL360 NOC DISPLAY</span>
+            <span id="live-time" class="display-clock">00:00:00</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="summary-stats">
+                <div class="stat-pill">Total: <span id="count-total">0</span></div>
+                <div class="stat-pill online">Online: <span id="count-online">0</span></div>
+                <div class="stat-pill offline">Offline: <span id="count-offline">0</span></div>
+            </div>
+            
+            <button id="fullscreen-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-color: var(--border-color);">
+                ⛶ Fullscreen
+            </button>
+        </div>
+    </header>
+
+    <div id="tv-servers-container" class="tv-grid">
+        <div class="tv-empty">
+            <h3>Memuat data monitoring...</h3>
+        </div>
+    </div>
+
+    <script>
+        // Update Live Clock
+        function updateClock() {
+            const clockEl = document.getElementById("live-time");
+            if (clockEl) {
+                const now = new Date();
+                clockEl.textContent = now.toLocaleTimeString([], { hour12: false });
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Fullscreen Toggle
+        const fsBtn = document.getElementById("fullscreen-btn");
+        if (fsBtn) {
+            fsBtn.addEventListener("click", () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                    });
+                    fsBtn.textContent = "Collapse";
+                } else {
+                    document.exitFullscreen();
+                    fsBtn.textContent = "⛶ Fullscreen";
+                }
+            });
+        }
+
+        // Fetch & Render Status Loop
+        async function fetchStatus() {
+            const container = document.getElementById("tv-servers-container");
+            try {
+                const res = await fetch("/api/public/servers");
+                if (!res.ok) throw new Error("Connection lost to Sentinel360");
+                const servers = await res.json();
+                
+                // Update Summary Counters
+                const total = servers.length;
+                const online = servers.filter(s => s.status === "online").length;
+                const offline = total - online;
+
+                document.getElementById("count-total").textContent = total;
+                document.getElementById("count-online").textContent = online;
+                document.getElementById("count-offline").textContent = offline;
+
+                if (total === 0) {
+                    container.innerHTML = `
+                        <div class="tv-empty">
+                            <h3>Belum ada server yang didaftarkan.</h3>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = servers.map(server => {
+                    const isOnline = server.status === "online";
+                    const statusClass = isOnline ? "status-online" : "status-offline";
+                    
+                    let metricsHtml = "";
+                    if (isOnline && (server.monitor_type === "agent" || server.monitor_type === "snmp")) {
+                        const cpu = server.cpu_usage !== null ? Math.round(server.cpu_usage) : null;
+                        const ram = server.ram_usage !== null ? Math.round(server.ram_usage) : null;
+                        const disk = server.disk_usage !== null ? Math.round(server.disk_usage) : null;
+
+                        const getBarColor = (val) => {
+                            if (val >= 90) return "danger";
+                            if (val >= 70) return "warning";
+                            return "normal";
+                        };
+
+                        // Compute RAM string
+                        let ramStr = "";
+                        if (ram !== null && server.ram_total) {
+                            const ramUsed = (ram / 100) * parseFloat(server.ram_total);
+                            ramStr = `(${ramUsed.toFixed(1)}G/${parseFloat(server.ram_total).toFixed(1)}G)`;
+                        }
+
+                        // Compute Disk string
+                        let diskStr = "";
+                        if (disk !== null && server.disk_total) {
+                            const diskUsed = (disk / 100) * parseFloat(server.disk_total);
+                            diskStr = `(${diskUsed.toFixed(1)}G/${parseFloat(server.disk_total).toFixed(1)}G)`;
+                        }
+
+                        metricsHtml = `
+                            <div class="tv-metrics">
+                                ${cpu !== null ? `
+                                <div class="tv-metric-row">
+                                    <div class="tv-metric-labels">
+                                        <span>CPU</span>
+                                        <span class="tv-metric-val">${cpu}%</span>
+                                    </div>
+                                    <div class="tv-progress-bg">
+                                        <div class="tv-progress-fill ${getBarColor(cpu)}" style="width: ${cpu}%"></div>
+                                    </div>
+                                </div>` : ""}
+                                
+                                ${ram !== null ? `
+                                <div class="tv-metric-row">
+                                    <div class="tv-metric-labels">
+                                        <span>RAM ${ramStr}</span>
+                                        <span class="tv-metric-val">${ram}%</span>
+                                    </div>
+                                    <div class="tv-progress-bg">
+                                        <div class="tv-progress-fill ${getBarColor(ram)}" style="width: ${ram}%"></div>
+                                    </div>
+                                </div>` : ""}
+                                
+                                ${disk !== null ? `
+                                <div class="tv-metric-row">
+                                    <div class="tv-metric-labels">
+                                        <span>DISK ${diskStr}</span>
+                                        <span class="tv-metric-val">${disk}%</span>
+                                    </div>
+                                    <div class="tv-progress-bg">
+                                        <div class="tv-progress-fill ${getBarColor(disk)}" style="width: ${disk}%"></div>
+                                    </div>
+                                </div>` : ""}
+                            </div>
+                        `;
+                    } else if (isOnline && server.monitor_type === "ping") {
+                        metricsHtml = `
+                            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; color: var(--online); font-size: 0.8rem; font-weight: 700; height: 75px;">
+                                ICMP LINK ACTIVE
+                            </div>
+                        `;
+                    } else {
+                        metricsHtml = `
+                            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem; height: 75px;">
+                                OFFLINE / DISCONNECTED
+                            </div>
+                        `;
+                    }
+
+                    const lastSeenStr = server.last_seen ? new Date(server.last_seen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Never";
+
+                    return `
+                        <div class="tv-card ${statusClass}">
+                            <div>
+                                <div class="tv-card-header">
+                                    <div>
+                                        <div class="tv-server-name" title="${server.name}">${server.name}</div>
+                                        <div class="tv-server-ip">${server.ip_address}</div>
+                                    </div>
+                                    <span class="tv-status-dot"></span>
+                                </div>
+                                ${metricsHtml}
+                            </div>
+                            
+                            <div class="tv-card-footer">
+                                <span class="tv-badge">${server.monitor_type}</span>
+                                <span>Seen: ${lastSeenStr}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } catch (error) {
+                console.error("Error polling TV status:", error);
+                // Keep the existing display or show small error banner if needed
+            }
+        }
+
+        // Run status poll loop every 5 seconds
+        fetchStatus();
+        setInterval(fetchStatus, 5000);
+    </script>
+</body>
+</html>

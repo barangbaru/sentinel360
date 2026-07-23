@@ -29,6 +29,24 @@ class ServerResponse(ServerBase):
     class Config:
         from_attributes = True
 
+class PublicServerResponse(BaseModel):
+    id: int
+    name: str
+    ip_address: str
+    monitor_type: str
+    status: str
+    last_seen: Optional[datetime] = None
+    os_info: Optional[str] = None
+    uptime: Optional[str] = None
+    cpu_usage: Optional[float] = None
+    ram_usage: Optional[float] = None
+    disk_usage: Optional[float] = None
+    ram_total: Optional[float] = None
+    disk_total: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
 class MetricHistoryResponse(BaseModel):
     id: int
     server_id: int

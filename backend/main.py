@@ -19,7 +19,8 @@ from .schemas import (
     ServerResponse,
     AgentMetricReport,
     AlertResponse,
-    MetricHistoryResponse
+    MetricHistoryResponse,
+    PublicServerResponse
 )
 from .scheduler import start_scheduler
 
@@ -234,6 +235,10 @@ async def read_server_details(request: Request, server_id: int, current_user: Us
         "role": current_user.role
     })
 
+@app.get("/tv", response_class=HTMLResponse)
+async def read_tv_dashboard(request: Request):
+    return templates.TemplateResponse(request, "tv.html", {})
+
 # ==========================================
 # REST API ENDPOINTS
 # ==========================================
@@ -276,6 +281,15 @@ def list_servers(
 ):
     """
     Get all registered servers and their current status/latest metrics.
+    """
+    return db.query(Server).all()
+
+@app.get("/api/public/servers", response_model=List[PublicServerResponse])
+def list_public_servers(
+    db: Session = Depends(get_db)
+):
+    """
+    Get all registered servers for the public TV display (no login required, strips sensitive API keys).
     """
     return db.query(Server).all()
 
