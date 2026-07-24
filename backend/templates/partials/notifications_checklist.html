@@ -1,0 +1,10 @@
+{% if not configs %}
+    <p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">Belum ada setup notifikasi. Silakan buat di Alarm Settings.</p>
+{% else %}
+    {% for c in configs %}
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; border: 1px solid var(--border-color); padding: 0.4rem; border-radius: 4px; background: rgba(255,255,255,0.01);">
+            <input type="checkbox" name="{{ input_name }}" value="{{ c.id }}" {% if active_ids and c.id in active_ids %}checked{% endif %}>
+            <strong>{{ c.name }}</strong> ({{ c.type.upper() }})
+        </label>
+    {% endfor %}
+{% endif %}

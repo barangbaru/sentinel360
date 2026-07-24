@@ -1,0 +1,107 @@
+{% if not servers %}
+    {% set hideBtn = "display: none;" if current_user_role == "view" else "" %}
+    <div class="card" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.4;">🖥️</div>
+        <h3 style="margin-bottom: 0.5rem;">Belum Ada Server</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Daftarkan server atau perangkat Anda untuk mulai memantau.</p>
+        <button class="btn btn-primary" style="{{ hideBtn }}" onclick="document.getElementById('add-server-modal').showModal()">Tambah Server</button>
+    </div>
+{% else %}
+    {% for server in servers %}
+        {% set isOnline = server.status == "online" %}
+        {% set isOffline = server.status == "offline" %}
+        {% set statusClass = "status-online" if isOnline else ("status-offline" if isOffline else "status-unknown") %}
+        {% set osStr = server.os_info or "Checking..." %}
+        {% set lastSeenStr = server.last_seen.strftime('%d/%m/%Y, %H:%M:%S') if server.last_seen else "Never" %}
+        
+        <div class="card {{ statusClass }}" draggable="true" data-id="{{ server.id }}">
+            <div class="card-header">
+                <div class="server-title-container">
+                    <a href="/server/{{ server.id }}" class="server-name">{{ server.name }}</a>
+                    <span class="server-ip">{{ server.ip_address }}</span>
+                </div>
+                <span class="status-badge {{ statusClass }}">
+                    <span class="dot"></span> {{ server.status }}
+                </span>
+            </div>
+            
+            <div class="server-meta-info">
+                <div><strong>OS:</strong> {{ osStr }}</div>
+                <div><strong>Uptime:</strong> {{ server.uptime or "N/A" }}</div>
+                <div><strong>Last Seen:</strong> {{ lastSeenStr }}</div>
+            </div>
+            
+            {% if isOnline and (server.monitor_type == "agent" or server.monitor_type == "snmp") %}
+                {% set cpu = (server.cpu_usage | round | int) if server.cpu_usage is not none else none %}
+                {% set ram = (server.ram_usage | round | int) if server.ram_usage is not none else none %}
+                {% set disk = (server.disk_usage | round | int) if server.disk_usage is not none else none %}
+                
+                <div class="metric-bar-group">
+                    {% if cpu is not none %}
+                        {% set cpu_color = "danger" if cpu >= 90 else ("warning" if cpu >= 70 else "normal") %}
+                        <div>
+                            <div class="metric-label-container">
+                                <span class="metric-label">CPU Load</span>
+                                <span class="metric-value">{{ cpu }}%</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill {{ cpu_color }}" style="width: {{ cpu }}%"></div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if ram is not none %}
+                        {% set ram_color = "danger" if ram >= 90 else ("warning" if ram >= 70 else "normal") %}
+                        {% set ramInfoStr = "" %}
+                        {% if server.ram_total %}
+                            {% set ramTotal = server.ram_total | float %}
+                            {% set ramUsed = (ram / 100) * ramTotal %}
+                            {% set ramInfoStr = " <span style='font-size: 0.7rem; color: var(--text-muted); font-weight: normal;'>(" ~ "%.1f" | format(ramUsed) ~ " GB / " ~ "%.1f" | format(ramTotal) ~ " GB)</span>" %}
+                        {% endif %}
+                        <div>
+                            <div class="metric-label-container">
+                                <span class="metric-label">RAM Usage{{ ramInfoStr | safe }}</span>
+                                <span class="metric-value">{{ ram }}%</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill {{ ram_color }}" style="width: {{ ram }}%"></div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if disk is not none %}
+                        {% set disk_color = "danger" if disk >= 90 else ("warning" if disk >= 70 else "normal") %}
+                        {% set diskInfoStr = "" %}
+                        {% if server.disk_total %}
+                            {% set diskTotal = server.disk_total | float %}
+                            {% set diskUsed = (disk / 100) * diskTotal %}
+                            {% set diskInfoStr = " <span style='font-size: 0.7rem; color: var(--text-muted); font-weight: normal;'>(" ~ "%.1f" | format(diskUsed) ~ " GB / " ~ "%.1f" | format(diskTotal) ~ " GB)</span>" %}
+                        {% endif %}
+                        <div>
+                            <div class="metric-label-container">
+                                <span class="metric-label">Disk Space{{ diskInfoStr | safe }}</span>
+                                <span class="metric-value">{{ disk }}%</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill {{ disk_color }}" style="width: {{ disk }}%"></div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% elif isOnline and server.monitor_type == "ping" %}
+                <div style="padding: 1rem 0; text-align: center; color: var(--online); font-size: 0.85rem; font-weight: 500;">
+                    ✓ ICMP Network Link OK
+                </div>
+            {% else %}
+                <div style="padding: 1.5rem 0; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+                    No data available ({{ server.status }})
+                </div>
+            {% endif %}
+            
+            <div class="server-footer">
+                <span class="monitor-type-badge">{{ server.monitor_type }}</span>
+                <a href="/server/{{ server.id }}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">Detail & Grafik</a>
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}

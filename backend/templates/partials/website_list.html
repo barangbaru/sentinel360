@@ -1,0 +1,65 @@
+{% if not websites %}
+    <div class="card" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.4;">🌐</div>
+        <h3 style="margin-bottom: 0.5rem;">Belum Ada Website</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Daftarkan website/URL Anda untuk memantau status HTTP & SSL.</p>
+        {% if current_user_role != "view" %}
+            <button class="btn btn-primary" onclick="document.getElementById('add-website-modal').showModal()">Tambah Website</button>
+        {% endif %}
+    </div>
+{% else %}
+    {% for web in websites %}
+        {% set isOnline = web.status == "online" %}
+        {% set isOffline = web.status == "offline" %}
+        {% set statusClass = "status-online" if isOnline else ("status-offline" if isOffline else "status-unknown") %}
+        {% set statusText = web.status %}
+        {% set hideDeleteBtn = "display: none;" if current_user_role == "view" else "" %}
+        
+        <div class="card {{ statusClass }}" draggable="true" data-id="{{ web.id }}">
+            <div class="card-header" style="margin-bottom: 0.75rem;">
+                <div class="server-title-container">
+                    <span class="server-name" style="font-size: 0.95rem;">{{ web.name }}</span>
+                    <a href="{{ web.url }}" target="_blank" class="server-ip" style="text-decoration: underline; color: var(--accent); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ web.url }}</a>
+                </div>
+                <span class="status-badge {{ statusClass }}">
+                    <span class="dot"></span> {{ statusText }}
+                </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.8rem; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div><strong>HTTP Code:</strong> <span style="color: {% if isOnline %}var(--online){% else %}var(--offline){% endif %}; font-weight: bold;">{{ web.status_code if web.status_code is not none else "FAIL" }}</span></div>
+                <div><strong>Latency:</strong> {{ (web.response_time | round | int) if web.response_time is not none else "N/A" }} ms</div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                <div>Last Check: {{ web.last_checked.strftime('%H:%M:%S') if web.last_checked else "Never" }}</div>
+                {% if web.ssl_status == "valid" %}
+                    <span class="monitor-type-badge" style="background: rgba(16, 185, 129, 0.15); border-color: var(--online); color: var(--online); font-size: 0.65rem;">SSL Valid: {{ web.ssl_days_left }}d</span>
+                {% elif web.ssl_status == "warning" %}
+                    <span class="monitor-type-badge" style="background: rgba(245, 158, 11, 0.15); border-color: var(--warning); color: var(--warning); font-size: 0.65rem;">SSL Expiring: {{ web.ssl_days_left }}d</span>
+                {% elif web.ssl_status == "expired" %}
+                    <span class="monitor-type-badge" style="background: rgba(239, 68, 68, 0.15); border-color: var(--offline); color: var(--offline); font-size: 0.65rem;">SSL EXPIRED</span>
+                {% elif web.ssl_status == "invalid" %}
+                    <span class="monitor-type-badge" style="background: rgba(239, 68, 68, 0.15); border-color: var(--offline); color: var(--offline); font-size: 0.65rem;">SSL INVALID</span>
+                {% else %}
+                    <span class="monitor-type-badge" style="font-size: 0.65rem;">No SSL (HTTP)</span>
+                {% endif %}
+            </div>
+
+            {% if web.error_message %}
+                <div style="font-size: 0.7rem; color: var(--offline); background: rgba(239, 68, 68, 0.05); padding: 0.4rem; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.15); margin-bottom: 0.75rem; max-height: 45px; overflow-y: auto; word-break: break-all;">
+                    {{ web.error_message }}
+                </div>
+            {% endif %}
+
+            <div class="server-footer" style="margin-top: auto; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--accent); color: var(--text-primary);" onclick="manageWebsiteNotifications({{ web.id }})">
+                    🔔 Notifikasi
+                </button>
+                <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444; {{ hideDeleteBtn }}" onclick="deleteWebsite({{ web.id }})">
+                    Hapus
+                </button>
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}

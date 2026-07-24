@@ -1,0 +1,25 @@
+{% if not configs %}
+    <p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">Belum ada setup notifikasi.</p>
+{% else %}
+    {% for c in configs %}
+        <div style="display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; background: rgba(255,255,255,0.02);">
+            <div>
+                <strong style="color: var(--text-primary); font-size: 0.9rem;">{{ c.name }}</strong>
+                <span class="monitor-type-badge" style="font-size: 0.65rem; margin-left: 0.5rem;">{{ c.type.upper() }}</span>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                    {% if c.type == 'telegram' %}
+                        Chat ID: {{ c.telegram_chat_id or 'N/A' }}
+                    {% elif c.type == 'whatsapp' %}
+                        Recipients: {{ c.whatsapp_recipients or 'N/A' }}
+                    {% elif c.type == 'smtp' %}
+                        Recipient: {{ c.smtp_recipient or 'N/A' }}
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.25rem;">
+                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--accent);" onclick="editNotificationConfig({{ c.id }})">Edit</button>
+                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444;" onclick="deleteNotificationConfig({{ c.id }})">Hapus</button>
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}

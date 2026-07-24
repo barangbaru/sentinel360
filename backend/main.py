@@ -420,6 +420,112 @@ async def read_tv_dashboard(request: Request):
     return templates.TemplateResponse(request, "tv.html", {})
 
 # ==========================================
+# HTMX PARTIAL TEMPLATE ENDPOINTS
+# ==========================================
+
+@app.get("/api/partials/servers", response_class=HTMLResponse)
+async def partial_servers(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    servers = db.query(Server).all()
+    return templates.TemplateResponse(
+        request,
+        "partials/server_list.html",
+        {"request": request, "servers": servers, "current_user_role": current_user.role}
+    )
+
+@app.get("/api/partials/websites", response_class=HTMLResponse)
+async def partial_websites(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    websites = db.query(Website).all()
+    return templates.TemplateResponse(
+        request,
+        "partials/website_list.html",
+        {"request": request, "websites": websites, "current_user_role": current_user.role}
+    )
+
+@app.get("/api/partials/alerts", response_class=HTMLResponse)
+async def partial_alerts(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    alerts = db.query(Alert).filter(Alert.resolved == False).order_by(Alert.timestamp.desc()).all()
+    return templates.TemplateResponse(
+        request,
+        "partials/alert_list.html",
+        {"request": request, "alerts": alerts, "current_user_role": current_user.role}
+    )
+
+@app.get("/api/partials/notifications/setup-list", response_class=HTMLResponse)
+async def partial_notifications_setup_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    configs = db.query(NotificationConfig).all()
+    return templates.TemplateResponse(
+        request,
+        "partials/notifications_setup_list.html",
+        {"request": request, "configs": configs}
+    )
+
+@app.get("/api/partials/notifications/creation-checklist", response_class=HTMLResponse)
+async def partial_notifications_creation_checklist(
+    request: Request,
+    input_name: str = "server_group_ids",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    configs = db.query(NotificationConfig).all()
+    return templates.TemplateResponse(
+        request,
+        "partials/notifications_checklist.html",
+        {"request": request, "configs": configs, "active_ids": [], "input_name": input_name}
+    )
+
+@app.get("/api/partials/websites/{website_id}/notifications-form", response_class=HTMLResponse)
+async def partial_website_notifications_form(
+    request: Request,
+    website_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    website = db.query(Website).filter(Website.id == website_id).first()
+    if not website:
+        raise HTTPException(status_code=404, detail="Website not found")
+    configs = db.query(NotificationConfig).all()
+    active_ids = [n.id for n in website.notifications]
+    return templates.TemplateResponse(
+        request,
+        "partials/notifications_checklist.html",
+        {"request": request, "configs": configs, "active_ids": active_ids, "input_name": "manage_web_group_id"}
+    )
+
+@app.get("/api/partials/servers/{server_id}/notifications-form", response_class=HTMLResponse)
+async def partial_server_notifications_form(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    server = db.query(Server).filter(Server.id == server_id).first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    configs = db.query(NotificationConfig).all()
+    active_ids = [n.id for n in server.notifications]
+    return templates.TemplateResponse(
+        request,
+        "partials/notifications_checklist.html",
+        {"request": request, "configs": configs, "active_ids": active_ids, "input_name": "server_detail_group_id"}
+    )
+
+# ==========================================
 # REST API ENDPOINTS
 # ==========================================
 

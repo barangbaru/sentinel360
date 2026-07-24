@@ -6,6 +6,7 @@
     <title>Sentinel360 | Server Monitoring Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%22100%%22 height=%22100%%22><rect width=%22100%%22 height=%22100%%22 fill=%22%236366f1%22 rx=%228%22/><text x=%2250%%22 y=%2250%%22 font-family=%22sans-serif%22 font-weight=%22bold%22 font-size=%2216%22 fill=%22white%22 dominant-baseline=%22central%22 text-anchor=%22middle%22>S360</text></svg>">
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
     <header>
@@ -56,8 +57,11 @@
                         <span>+</span> Tambah Website
                     </button>
                 </div>
-                <div id="websites-container" class="server-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 2rem;">
-                    <!-- Loaded dynamically via app.js -->
+                <div id="websites-container" class="server-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 2rem;"
+                     hx-get="/api/partials/websites"
+                     hx-trigger="load, every 5s"
+                     hx-swap="innerHTML">
+                    <!-- Loaded dynamically via HTMX -->
                     <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
                         <p style="color: var(--text-secondary)">Memuat data website...</p>
                     </div>
@@ -67,8 +71,11 @@
                 <div class="section-header">
                     <h2 class="section-title">🖥️ Server & Perangkat yang Dimonitor</h2>
                 </div>
-                <div id="servers-container" class="server-grid">
-                    <!-- Loaded dynamically via app.js -->
+                <div id="servers-container" class="server-grid"
+                     hx-get="/api/partials/servers"
+                     hx-trigger="load, every 5s"
+                     hx-swap="innerHTML">
+                    <!-- Loaded dynamically via HTMX -->
                     <div style="grid-column: 1/-1; text-align: center; padding: 4rem;">
                         <p style="color: var(--text-secondary)">Memuat data server...</p>
                     </div>
@@ -81,8 +88,11 @@
                     <h2 class="section-title">🚨 Alarm Aktif</h2>
                 </div>
                 <div class="sidebar-panel">
-                    <div id="alerts-container" class="alert-list">
-                        <!-- Loaded dynamically via app.js -->
+                    <div id="alerts-container" class="alert-list"
+                         hx-get="/api/partials/alerts"
+                         hx-trigger="load, every 5s"
+                         hx-swap="innerHTML">
+                        <!-- Loaded dynamically via HTMX -->
                         <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                             Memuat alarm...
                         </div>
@@ -130,8 +140,12 @@
             
             <div class="form-group">
                 <label class="form-label">Notifikasi Aktif (Multi-select)</label>
-                <div id="add_server_groups_checklist" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 0.35rem;">
-                    <!-- Checked items are loaded dynamically in app.js -->
+                <div id="add_server_groups_checklist" 
+                     hx-get="/api/partials/notifications/creation-checklist?input_name=server_group_ids" 
+                     hx-trigger="load" 
+                     hx-swap="innerHTML"
+                     style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 0.35rem;">
+                    <!-- Checked items are loaded dynamically via HTMX -->
                 </div>
                 <span style="font-size: 0.75rem; color: var(--text-secondary);">Jika tidak ada notifikasi yang dipilih, perangkat ini tidak akan mengirimkan notifikasi.</span>
             </div>
@@ -188,8 +202,12 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Notifikasi Aktif (Multi-select)</label>
-                <div id="add_web_groups_checklist" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 0.35rem;">
-                    <!-- Checked items are loaded dynamically in app.js -->
+                <div id="add_web_groups_checklist" 
+                     hx-get="/api/partials/notifications/creation-checklist?input_name=web_group_ids" 
+                     hx-trigger="load" 
+                     hx-swap="innerHTML"
+                     style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 0.35rem;">
+                    <!-- Checked items are loaded dynamically via HTMX -->
                 </div>
                 <span style="font-size: 0.75rem; color: var(--text-secondary);">Jika tidak ada notifikasi yang dipilih, website ini tidak akan mengirimkan notifikasi.</span>
             </div>
@@ -303,8 +321,12 @@
         </div>
         <div style="padding: 0.5rem 0;">
             <!-- Setup List -->
-            <div id="notifications-setup-list" style="margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
-                <!-- Loaded dynamically -->
+            <div id="notifications-setup-list" 
+                 hx-get="/api/partials/notifications/setup-list"
+                 hx-trigger="load"
+                 hx-swap="innerHTML"
+                 style="margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- Loaded dynamically via HTMX -->
             </div>
             
             <!-- Setup Form -->

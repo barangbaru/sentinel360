@@ -1,0 +1,16 @@
+{% if not alerts %}
+    <div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.85rem;">
+        Tidak ada alarm aktif. Sistem aman.
+    </div>
+{% else %}
+    {% for alert in alerts %}
+        {% set hideResolveBtn = "display: none;" if current_user_role == "view" else "" %}
+        <div class="alert-item">
+            <span class="alert-msg">{{ alert.message }}</span>
+            <span class="alert-time">⚠️ Aktif pada: {{ alert.timestamp.strftime('%H:%M:%S') if alert.timestamp else "Unknown" }}</span>
+            <button class="btn btn-secondary" style="align-self: flex-end; padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.2); {{ hideResolveBtn }}" onclick="resolveAlert({{ alert.id }})">
+                Selesaikan
+            </button>
+        </div>
+    {% endfor %}
+{% endif %}
