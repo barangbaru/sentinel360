@@ -122,60 +122,65 @@ function initDashboard() {
         addModal.close();
     });
 
-    // Notification Groups Logic
+    // Notification Setups Logic
     async function loadNotificationGroups() {
         try {
-            const res = await fetch("/api/notification-groups");
-            if (!res.ok) throw new Error("Gagal mengambil data group notifikasi.");
-            const groups = await res.json();
+            const res = await fetch("/api/notifications");
+            if (!res.ok) throw new Error("Gagal mengambil data setup notifikasi.");
+            const configs = await res.json();
 
-            // Populate checklists
+            // Populate checklists in forms
             const addServerChecklist = document.getElementById("add_server_groups_checklist");
             const addWebChecklist = document.getElementById("add_web_groups_checklist");
             
-            const checklistsHtml = groups.length === 0 
-                ? '<p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">Belum ada group kustom. Silakan buat di Alarm Settings.</p>'
-                : groups.map(g => `
+            const checklistsHtml = configs.length === 0 
+                ? '<p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">Belum ada setup notifikasi. Silakan buat di Alarm Settings.</p>'
+                : configs.map(c => `
                     <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer;">
-                        <input type="checkbox" name="server_group_ids" value="${g.id}"> ${g.name}
+                        <input type="checkbox" name="server_group_ids" value="${c.id}">
+                        <strong>${c.name}</strong> (${c.type.toUpperCase()})
                     </label>
                 `).join("");
 
-            const checklistsWebHtml = groups.length === 0 
-                ? '<p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">Belum ada group kustom. Silakan buat di Alarm Settings.</p>'
-                : groups.map(g => `
+            const checklistsWebHtml = configs.length === 0 
+                ? '<p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">Belum ada setup notifikasi. Silakan buat di Alarm Settings.</p>'
+                : configs.map(c => `
                     <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer;">
-                        <input type="checkbox" name="web_group_ids" value="${g.id}"> ${g.name}
+                        <input type="checkbox" name="web_group_ids" value="${c.id}">
+                        <strong>${c.name}</strong> (${c.type.toUpperCase()})
                     </label>
                 `).join("");
                 
             if (addServerChecklist) addServerChecklist.innerHTML = checklistsHtml;
             if (addWebChecklist) addWebChecklist.innerHTML = checklistsWebHtml;
             
-            // Populate list inside modal
-            const listContainer = document.getElementById("notification-groups-list");
+            // Populate setup list inside Settings modal
+            const listContainer = document.getElementById("notifications-setup-list");
             if (listContainer) {
-                if (groups.length === 0) {
-                    listContainer.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">Belum ada group notifikasi kustom.</p>';
+                if (configs.length === 0) {
+                    listContainer.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">Belum ada setup notifikasi.</p>';
                 } else {
-                    listContainer.innerHTML = groups.map(g => `
+                    listContainer.innerHTML = configs.map(c => `
                         <div style="display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; background: rgba(255,255,255,0.02);">
                             <div>
-                                <strong style="color: var(--text-primary); font-size: 0.9rem;">${g.name}</strong>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">${c.name}</strong>
+                                <span class="monitor-type-badge" style="font-size: 0.65rem; margin-left: 0.5rem;">${c.type.toUpperCase()}</span>
                                 <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                    ${g.telegram_chat_id ? '📱 Telegram ' : ''}
-                                    ${g.whatsapp_recipients ? '💬 WA ' : ''}
-                                    ${g.smtp_recipient ? '✉️ Email ' : ''}
-                                    ${(!g.telegram_chat_id && !g.whatsapp_recipients && !g.smtp_recipient) ? '(Tanpa target kustom)' : ''}
+                                    ${c.type === 'telegram' ? `Chat ID: ${c.telegram_chat_id || 'N/A'}` : ''}
+                                    ${c.type === 'whatsapp' ? `Recipients: ${c.whatsapp_recipients || 'N/A'}` : ''}
+                                    ${c.type === 'smtp' ? `Recipient: ${c.smtp_recipient || 'N/A'}` : ''}
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444;" onclick="deleteNotificationGroup(${g.id})">Hapus</button>
+                            <div style="display: flex; gap: 0.25rem;">
+                                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--accent);" onclick="editNotificationConfig(${c.id})">Edit</button>
+                                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444;" onclick="deleteNotificationConfig(${c.id})">Hapus</button>
+                            </div>
                         </div>
                     `).join("");
                 }
             }
         } catch (error) {
-            console.error("Error loading notification groups:", error);
+            console.error("Error loading notifications setups:", error);
         }
     }
 
@@ -1120,29 +1125,29 @@ function initDetailPage() {
         const container = document.getElementById("server-groups-checklist");
         if (!container) return;
         try {
-            // Get active groups of this server first
+            // Get active notifications of this server first
             const sRes = await fetch(`/api/servers/${serverId}`);
             if (!sRes.ok) throw new Error("Gagal mengambil info server.");
             const server = await sRes.json();
-            const activeIds = (server.notification_groups || []).map(g => g.id);
+            const activeIds = (server.notifications || []).map(n => n.id);
 
-            // Get all master groups
-            const res = await fetch("/api/notification-groups");
-            if (!res.ok) throw new Error("Gagal mengambil data group notifikasi.");
-            const allGroups = await res.json();
+            // Get all notification setups
+            const res = await fetch("/api/notifications");
+            if (!res.ok) throw new Error("Gagal mengambil data setup notifikasi.");
+            const allConfigs = await res.json();
 
-            if (allGroups.length === 0) {
-                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic; margin: 0;">Belum ada group notifikasi kustom. Silakan buat di Dashboard -> Alarm Settings.</p>';
+            if (allConfigs.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic; margin: 0;">Belum ada setup notifikasi. Silakan buat di Dashboard -> Notifikasi.</p>';
             } else {
-                container.innerHTML = allGroups.map(g => `
+                container.innerHTML = allConfigs.map(c => `
                     <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.01);">
-                        <input type="checkbox" name="server_detail_group_id" value="${g.id}" ${activeIds.includes(g.id) ? 'checked' : ''}>
-                        <strong>${g.name}</strong>
+                        <input type="checkbox" name="server_detail_group_id" value="${c.id}" ${activeIds.includes(c.id) ? 'checked' : ''}>
+                        <strong>${c.name}</strong> (${c.type.toUpperCase()})
                     </label>
                 `).join("");
             }
         } catch (error) {
-            console.error("Error loading server notification groups:", error);
+            console.error("Error loading server notification configurations:", error);
         }
     }
 
@@ -1150,17 +1155,17 @@ function initDetailPage() {
     if (saveServerGroupsBtn) {
         saveServerGroupsBtn.addEventListener("click", async () => {
             const checkedBoxes = document.querySelectorAll('input[name="server_detail_group_id"]:checked');
-            const groupIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
+            const notificationIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
 
             try {
-                const res = await fetch(`/api/servers/${serverId}/notification-groups`, {
+                const res = await fetch(`/api/servers/${serverId}/notifications`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(groupIds)
+                    body: JSON.stringify(notificationIds)
                 });
-                if (!res.ok) throw new Error("Gagal menyimpan pengaturan group.");
+                if (!res.ok) throw new Error("Gagal menyimpan pengaturan notifikasi.");
 
-                alert("Pengaturan group notifikasi berhasil disimpan!");
+                alert("Pengaturan notifikasi berhasil disimpan!");
             } catch (error) {
                 alert("Error: " + error.message);
             }
