@@ -2,6 +2,21 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
+class NotificationGroupBase(BaseModel):
+    name: str
+    telegram_chat_id: Optional[str] = None
+    whatsapp_recipients: Optional[str] = None
+    smtp_recipient: Optional[str] = None
+
+class NotificationGroupCreate(NotificationGroupBase):
+    pass
+
+class NotificationGroupResponse(NotificationGroupBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 class ServerBase(BaseModel):
     name: str
     ip_address: str
@@ -9,7 +24,7 @@ class ServerBase(BaseModel):
     snmp_community: Optional[str] = "public"
     snmp_port: Optional[int] = 161
     snmp_version: Optional[str] = "2c"
-    notification_group_id: Optional[int] = None
+    notification_group_ids: List[int] = []
     failed_threshold: int = 1
 
 class ServerCreate(ServerBase):
@@ -27,6 +42,7 @@ class ServerResponse(ServerBase):
     disk_usage: Optional[float] = None
     ram_total: Optional[float] = None
     disk_total: Optional[float] = None
+    notification_groups: List[NotificationGroupResponse] = []
 
     class Config:
         from_attributes = True
@@ -45,8 +61,8 @@ class PublicServerResponse(BaseModel):
     disk_usage: Optional[float] = None
     ram_total: Optional[float] = None
     disk_total: Optional[float] = None
-    notification_group_id: Optional[int] = None
     failed_threshold: int = 1
+    notification_groups: List[NotificationGroupResponse] = []
 
     class Config:
         from_attributes = True
@@ -93,7 +109,7 @@ class AgentMetricReport(BaseModel):
 class WebsiteBase(BaseModel):
     name: str
     url: str
-    notification_group_id: Optional[int] = None
+    notification_group_ids: List[int] = []
     failed_threshold: int = 1
 
 class WebsiteCreate(WebsiteBase):
@@ -109,6 +125,7 @@ class WebsiteResponse(WebsiteBase):
     ssl_days_left: Optional[int] = None
     last_checked: Optional[datetime] = None
     error_message: Optional[str] = None
+    notification_groups: List[NotificationGroupResponse] = []
 
     class Config:
         from_attributes = True
@@ -154,18 +171,3 @@ class SystemSettingsResponse(SystemSettingsBase):
 
 class SystemSettingsUpdate(SystemSettingsBase):
     pass
-
-class NotificationGroupBase(BaseModel):
-    name: str
-    telegram_chat_id: Optional[str] = None
-    whatsapp_recipients: Optional[str] = None
-    smtp_recipient: Optional[str] = None
-
-class NotificationGroupCreate(NotificationGroupBase):
-    pass
-
-class NotificationGroupResponse(NotificationGroupBase):
-    id: int
-
-    class Config:
-        from_attributes = True

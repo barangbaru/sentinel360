@@ -3,6 +3,21 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from .database import Base
+from sqlalchemy import Table
+
+server_notification_group = Table(
+    "server_notification_group",
+    Base.metadata,
+    Column("server_id", Integer, ForeignKey("servers.id", ondelete="CASCADE"), primary_key=True),
+    Column("notification_group_id", Integer, ForeignKey("notification_groups.id", ondelete="CASCADE"), primary_key=True)
+)
+
+website_notification_group = Table(
+    "website_notification_group",
+    Base.metadata,
+    Column("website_id", Integer, ForeignKey("websites.id", ondelete="CASCADE"), primary_key=True),
+    Column("notification_group_id", Integer, ForeignKey("notification_groups.id", ondelete="CASCADE"), primary_key=True)
+)
 
 class NotificationGroup(Base):
     __tablename__ = "notification_groups"
@@ -43,11 +58,10 @@ class Server(Base):
     metrics = relationship("MetricHistory", back_populates="server", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="server", cascade="all, delete-orphan")
 
-    notification_group_id = Column(Integer, ForeignKey("notification_groups.id", ondelete="SET NULL"), nullable=True)
     failed_threshold = Column(Integer, default=1, nullable=False)
     consecutive_failures = Column(Integer, default=0, nullable=False)
 
-    notification_group = relationship("NotificationGroup")
+    notification_groups = relationship("NotificationGroup", secondary=server_notification_group)
 
 class MetricHistory(Base):
     __tablename__ = "metric_history"
@@ -105,11 +119,10 @@ class Website(Base):
     last_checked = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
 
-    notification_group_id = Column(Integer, ForeignKey("notification_groups.id", ondelete="SET NULL"), nullable=True)
     failed_threshold = Column(Integer, default=1, nullable=False)
     consecutive_failures = Column(Integer, default=0, nullable=False)
 
-    notification_group = relationship("NotificationGroup")
+    notification_groups = relationship("NotificationGroup", secondary=website_notification_group)
 
 class SystemSettings(Base):
     __tablename__ = "system_settings"

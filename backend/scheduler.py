@@ -78,7 +78,11 @@ def scheduler_loop():
                                 
                                 # Send alert
                                 from .notifications import send_alert_notification
-                                send_alert_notification(db, alert_msg, server.notification_group_id)
+                                if server.notification_groups:
+                                    for group in server.notification_groups:
+                                        send_alert_notification(db, alert_msg, group.id)
+                                else:
+                                    send_alert_notification(db, alert_msg, None)
                                 
                         db.commit()
 

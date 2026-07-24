@@ -105,7 +105,11 @@ def check_website(db, website):
                 alert.resolved = True
                 alert.resolved_at = datetime.utcnow()
             from .notifications import send_alert_notification
-            send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE", website.notification_group_id)
+            if website.notification_groups:
+                for group in website.notification_groups:
+                    send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE", group.id)
+            else:
+                send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE", None)
     else:
         website.consecutive_failures = (website.consecutive_failures or 0) + 1
         threshold = website.failed_threshold or 1
@@ -122,7 +126,11 @@ def check_website(db, website):
                 )
                 db.add(alert)
                 from .notifications import send_alert_notification
-                send_alert_notification(db, alert_msg, website.notification_group_id)
+                if website.notification_groups:
+                    for group in website.notification_groups:
+                        send_alert_notification(db, alert_msg, group.id)
+                else:
+                    send_alert_notification(db, alert_msg, None)
         else:
             import logging
             logging.getLogger("WebWorker").info(f"Website {website.name} ({website.url}) check failed ({website.consecutive_failures}/{threshold} attempts)")

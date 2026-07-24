@@ -122,22 +122,28 @@ function initDashboard() {
         addModal.close();
     });
 
-    // Notification Groups Logic
-    async function loadNotificationGroups() {
-        try {
-            const res = await fetch("/api/notification-groups");
-            if (!res.ok) throw new Error("Gagal mengambil data group notifikasi.");
-            const groups = await res.json();
+            // Populate checklists
+            const addServerChecklist = document.getElementById("add_server_groups_checklist");
+            const addWebChecklist = document.getElementById("add_web_groups_checklist");
             
-            // Populate dropdowns
-            const serverSelect = document.getElementById("notification_group_id");
-            const webSelect = document.getElementById("web_notification_group_id");
-            
-            const optionsHtml = '<option value="">Default (Semua Channel Global)</option>' + 
-                groups.map(g => `<option value="${g.id}">${g.name}</option>`).join("");
+            const checklistsHtml = groups.length === 0 
+                ? '<p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">Belum ada group kustom. Silakan buat di Alarm Settings.</p>'
+                : groups.map(g => `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer;">
+                        <input type="checkbox" name="server_group_ids" value="${g.id}"> ${g.name}
+                    </label>
+                `).join("");
+
+            const checklistsWebHtml = groups.length === 0 
+                ? '<p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">Belum ada group kustom. Silakan buat di Alarm Settings.</p>'
+                : groups.map(g => `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer;">
+                        <input type="checkbox" name="web_group_ids" value="${g.id}"> ${g.name}
+                    </label>
+                `).join("");
                 
-            if (serverSelect) serverSelect.innerHTML = optionsHtml;
-            if (webSelect) webSelect.innerHTML = optionsHtml;
+            if (addServerChecklist) addServerChecklist.innerHTML = checklistsHtml;
+            if (addWebChecklist) addWebChecklist.innerHTML = checklistsWebHtml;
             
             // Populate list inside modal
             const listContainer = document.getElementById("notification-groups-list");
@@ -176,6 +182,72 @@ function initDashboard() {
             alert("Error: " + error.message);
         }
     };
+
+    window.manageWebsiteGroups = async function(webId) {
+        const modal = document.getElementById("manage-website-groups-modal");
+        const container = document.getElementById("web-groups-checklist");
+        document.getElementById("manage_web_id").value = webId;
+
+        // Fetch groups
+        try {
+            const gRes = await fetch("/api/notification-groups");
+            if (!gRes.ok) throw new Error("Gagal mengambil data group.");
+            const allGroups = await gRes.json();
+
+            // Fetch website current active groups
+            const web = cachedWebsites.find(w => w.id === webId);
+            const activeGroupIds = (web && web.notification_groups) ? web.notification_groups.map(g => g.id) : [];
+
+            if (allGroups.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">Belum ada group notifikasi kustom. Silakan buat di Alarm Settings.</p>';
+            } else {
+                container.innerHTML = allGroups.map(g => `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; border: 1px solid var(--border-color); padding: 0.4rem; border-radius: 4px; background: rgba(255,255,255,0.01);">
+                        <input type="checkbox" name="manage_web_group_id" value="${g.id}" ${activeGroupIds.includes(g.id) ? 'checked' : ''}>
+                        <strong>${g.name}</strong>
+                    </label>
+                `).join("");
+            }
+
+            modal.showModal();
+        } catch (error) {
+            alert(error.message);
+        }
+    };
+
+    // Cancel manage web groups modal
+    const cancelWebGroupsBtn = document.getElementById("cancel-web-groups-btn");
+    const webGroupsModal = document.getElementById("manage-website-groups-modal");
+    if (cancelWebGroupsBtn && webGroupsModal) {
+        cancelWebGroupsBtn.addEventListener("click", () => {
+            webGroupsModal.close();
+        });
+    }
+
+    // Save website groups
+    const saveWebGroupsBtn = document.getElementById("save-web-groups-btn");
+    if (saveWebGroupsBtn && webGroupsModal) {
+        saveWebGroupsBtn.addEventListener("click", async () => {
+            const webId = document.getElementById("manage_web_id").value;
+            const checkedBoxes = document.querySelectorAll('input[name="manage_web_group_id"]:checked');
+            const groupIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
+
+            try {
+                const res = await fetch(`/api/websites/${webId}/notification-groups`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(groupIds)
+                });
+                if (!res.ok) throw new Error("Gagal menyimpan pengaturan group.");
+
+                webGroupsModal.close();
+                alert("Pengaturan group berhasil disimpan!");
+                loadWebsites();
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
+    }
 
     const createGroupBtn = document.getElementById("create-group-btn");
     if (createGroupBtn) {
@@ -484,12 +556,14 @@ function initDashboard() {
     addForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         
-        const rawGroupId = document.getElementById("notification_group_id").value;
+        const groupCheckboxes = document.querySelectorAll('input[name="server_group_ids"]:checked');
+        const notification_group_ids = Array.from(groupCheckboxes).map(cb => parseInt(cb.value, 10));
+        
         const payload = {
             name: document.getElementById("name").value,
             ip_address: document.getElementById("ip_address").value,
             monitor_type: monitorTypeSelect.value,
-            notification_group_id: rawGroupId ? parseInt(rawGroupId, 10) : null,
+            notification_group_ids: notification_group_ids,
             failed_threshold: parseInt(document.getElementById("failed_threshold").value, 10) || 1,
         };
 
@@ -754,22 +828,24 @@ function initDashboard() {
     if (addWebForm && addWebModal) {
         addWebForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            const rawGroupId = document.getElementById("web_notification_group_id").value;
-            const notification_group_id = rawGroupId ? parseInt(rawGroupId, 10) : null;
+            const groupCheckboxes = document.querySelectorAll('input[name="web_group_ids"]:checked');
+            const notification_group_ids = Array.from(groupCheckboxes).map(cb => parseInt(cb.value, 10));
             const failed_threshold = parseInt(document.getElementById("web_failed_threshold").value, 10) || 1;
 
             try {
                 const res = await fetch("/api/websites", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name, url, notification_group_id, failed_threshold })
+                    body: JSON.stringify({ name, url, notification_group_ids, failed_threshold })
                 });
 
                 if (!res.ok) {
                     const data = await res.json();
                     throw new Error(data.detail || "Gagal menyimpan website.");
                 }
-
+                
+                addWebForm.reset();
+                document.querySelectorAll('input[name="web_group_ids"]').forEach(cb => cb.checked = false);
                 addWebModal.close();
                 loadWebsites();
             } catch (error) {
@@ -883,7 +959,10 @@ function initDashboard() {
                         ${web.error_message}
                     </div>` : ""}
 
-                    <div class="server-footer" style="margin-top: auto; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); justify-content: flex-end;">
+                    <div class="server-footer" style="margin-top: auto; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--accent); color: var(--text-primary);" onclick="manageWebsiteGroups(${web.id})">
+                            🔔 Group
+                        </button>
                         <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444; ${hideDeleteBtn}" onclick="deleteWebsite(${web.id})">
                             Hapus
                         </button>
@@ -1002,6 +1081,57 @@ function initDetailPage() {
     const deleteBtn = document.getElementById("delete-server-btn");
     if (deleteBtn && typeof USER_ROLE !== "undefined" && USER_ROLE === "view") {
         deleteBtn.style.display = "none";
+    }
+
+    async function loadServerNotificationGroups() {
+        const container = document.getElementById("server-groups-checklist");
+        if (!container) return;
+        try {
+            // Get active groups of this server first
+            const sRes = await fetch(`/api/servers/${serverId}`);
+            if (!sRes.ok) throw new Error("Gagal mengambil info server.");
+            const server = await sRes.json();
+            const activeIds = (server.notification_groups || []).map(g => g.id);
+
+            // Get all master groups
+            const res = await fetch("/api/notification-groups");
+            if (!res.ok) throw new Error("Gagal mengambil data group notifikasi.");
+            const allGroups = await res.json();
+
+            if (allGroups.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic; margin: 0;">Belum ada group notifikasi kustom. Silakan buat di Dashboard -> Alarm Settings.</p>';
+            } else {
+                container.innerHTML = allGroups.map(g => `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.01);">
+                        <input type="checkbox" name="server_detail_group_id" value="${g.id}" ${activeIds.includes(g.id) ? 'checked' : ''}>
+                        <strong>${g.name}</strong>
+                    </label>
+                `).join("");
+            }
+        } catch (error) {
+            console.error("Error loading server notification groups:", error);
+        }
+    }
+
+    const saveServerGroupsBtn = document.getElementById("save-server-groups-btn");
+    if (saveServerGroupsBtn) {
+        saveServerGroupsBtn.addEventListener("click", async () => {
+            const checkedBoxes = document.querySelectorAll('input[name="server_detail_group_id"]:checked');
+            const groupIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
+
+            try {
+                const res = await fetch(`/api/servers/${serverId}/notification-groups`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(groupIds)
+                });
+                if (!res.ok) throw new Error("Gagal menyimpan pengaturan group.");
+
+                alert("Pengaturan group notifikasi berhasil disimpan!");
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
     }
 
     async function loadServerDetails() {
@@ -1326,6 +1456,7 @@ function initDetailPage() {
     // Initial load and start poll
     loadServerDetails();
     loadMetrics();
+    loadServerNotificationGroups();
     detailPollInterval = setInterval(() => {
         loadServerDetails();
         loadMetrics();

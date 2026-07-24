@@ -352,6 +352,7 @@ def create_server(
             detail=f"Server with IP address '{server_in.ip_address}' is already registered."
         )
         
+    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(server_in.notification_group_ids)).all()
     db_server = Server(
         name=server_in.name,
         ip_address=server_in.ip_address,
@@ -359,8 +360,8 @@ def create_server(
         snmp_community=server_in.snmp_community,
         snmp_port=server_in.snmp_port,
         snmp_version=server_in.snmp_version,
-        notification_group_id=server_in.notification_group_id,
         failed_threshold=server_in.failed_threshold,
+        notification_groups=groups,
         status="unknown"
     )
     db.add(db_server)
@@ -440,11 +441,12 @@ def create_website(
     if existing:
         raise HTTPException(status_code=400, detail="Website URL already registered")
         
+    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(website.notification_group_ids)).all()
     db_website = Website(
         name=website.name,
         url=website.url,
-        notification_group_id=website.notification_group_id,
         failed_threshold=website.failed_threshold,
+        notification_groups=groups,
         status="unknown"
     )
     db.add(db_website)
@@ -724,10 +726,44 @@ def delete_notification_group(
     if not db_group:
         raise HTTPException(status_code=404, detail="Group notifikasi tidak ditemukan")
     
-    # Set references in servers and websites to NULL
+    # Remove associations
+    db.execute(text("DELETE FROM server_notification_group WHERE notification_group_id = :gid"), {"gid": group_id})
+    db.execute(text("DELETE FROM website_notification_group WHERE notification_group_id = :gid"), {"gid": group_id})
+    
+    # Set legacy reference to NULL
     db.query(Server).filter(Server.notification_group_id == group_id).update({Server.notification_group_id: None})
     db.query(Website).filter(Website.notification_group_id == group_id).update({Website.notification_group_id: None})
     
     db.delete(db_group)
     db.commit()
     return None
+
+@app.post("/api/servers/{server_id}/notification-groups", status_code=status.HTTP_200_OK)
+def update_server_notification_groups(
+    server_id: int,
+    group_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    server = db.query(Server).filter(Server.id == server_id).first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(group_ids)).all()
+    server.notification_groups = groups
+    db.commit()
+    return {"status": "ok", "message": "Notification groups updated successfully"}
+
+@app.post("/api/websites/{website_id}/notification-groups", status_code=status.HTTP_200_OK)
+def update_website_notification_groups(
+    website_id: int,
+    group_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    website = db.query(Website).filter(Website.id == website_id).first()
+    if not website:
+        raise HTTPException(status_code=404, detail="Website not found")
+    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(group_ids)).all()
+    website.notification_groups = groups
+    db.commit()
+    return {"status": "ok", "message": "Notification groups updated successfully"}

@@ -119,7 +119,11 @@ def ping_server(db: Session, server: Server):
             
             # Send resolution alert
             from .notifications import send_alert_notification
-            send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", server.notification_group_id)
+            if server.notification_groups:
+                for group in server.notification_groups:
+                    send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", group.id)
+            else:
+                send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", None)
         else:
             server.status = "online"
     else:
@@ -144,7 +148,11 @@ def ping_server(db: Session, server: Server):
                 
                 # Send alert
                 from .notifications import send_alert_notification
-                send_alert_notification(db, alert_msg, server.notification_group_id)
+                if server.notification_groups:
+                    for group in server.notification_groups:
+                        send_alert_notification(db, alert_msg, group.id)
+                else:
+                    send_alert_notification(db, alert_msg, None)
         else:
             logger.info(f"Server {server.name} ({server.ip_address}) ping failed ({server.consecutive_failures}/{threshold} attempts)")
 

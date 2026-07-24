@@ -150,7 +150,11 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 db.add(alert)
                 logger.warning(f"ALERT: SNMP Server {server.name} went offline.")
                 from .notifications import send_alert_notification
-                send_alert_notification(db, alert_msg, server.notification_group_id)
+                if server.notification_groups:
+                    for group in server.notification_groups:
+                        send_alert_notification(db, alert_msg, group.id)
+                else:
+                    send_alert_notification(db, alert_msg, None)
         else:
             logger.info(f"SNMP Server {server.name} query failed ({server.consecutive_failures}/{threshold} attempts)")
         
@@ -261,7 +265,11 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
             alert.resolved_at = datetime.utcnow()
         logger.info(f"SNMP Server {server.name} came back online. Resolved active alerts.")
         from .notifications import send_alert_notification
-        send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", server.notification_group_id)
+        if server.notification_groups:
+            for group in server.notification_groups:
+                send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", group.id)
+        else:
+            send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", None)
         
     # Check threshold alerts (e.g. CPU/RAM > 90%)
     if avg_cpu and avg_cpu > 90.0:
@@ -280,7 +288,11 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 resolved=False
             ))
             from .notifications import send_alert_notification
-            send_alert_notification(db, msg, server.notification_group_id)
+            if server.notification_groups:
+                for group in server.notification_groups:
+                    send_alert_notification(db, msg, group.id)
+            else:
+                send_alert_notification(db, msg, None)
             
     if ram_usage_pct and ram_usage_pct > 90.0:
         existing_ram_alert = db.query(Alert).filter(
@@ -297,7 +309,11 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 resolved=False
             ))
             from .notifications import send_alert_notification
-            send_alert_notification(db, msg, server.notification_group_id)
+            if server.notification_groups:
+                for group in server.notification_groups:
+                    send_alert_notification(db, msg, group.id)
+            else:
+                send_alert_notification(db, msg, None)
 
     db.commit()
     db.refresh(server)
