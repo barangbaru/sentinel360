@@ -105,9 +105,9 @@ def check_website(db, website):
                 alert.resolved = True
                 alert.resolved_at = datetime.utcnow()
             from .notifications import send_alert_notification
-            if website.notification_groups:
-                for group in website.notification_groups:
-                    send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE", group.id)
+            if website.notifications:
+                for config in website.notifications:
+                    send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE", config.id)
             else:
                 send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE", None)
     else:
@@ -126,9 +126,9 @@ def check_website(db, website):
                 )
                 db.add(alert)
                 from .notifications import send_alert_notification
-                if website.notification_groups:
-                    for group in website.notification_groups:
-                        send_alert_notification(db, alert_msg, group.id)
+                if website.notifications:
+                    for config in website.notifications:
+                        send_alert_notification(db, alert_msg, config.id)
                 else:
                     send_alert_notification(db, alert_msg, None)
         else:

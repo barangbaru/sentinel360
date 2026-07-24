@@ -2,16 +2,30 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
-class NotificationGroupBase(BaseModel):
+class NotificationConfigBase(BaseModel):
     name: str
+    type: str  # "telegram", "whatsapp", "smtp"
+    is_enabled: bool = True
+    
+    telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
+    
+    whatsapp_webhook_url: Optional[str] = None
+    whatsapp_token: Optional[str] = None
+    whatsapp_session_id: Optional[str] = None
     whatsapp_recipients: Optional[str] = None
+    
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_sender: Optional[str] = None
     smtp_recipient: Optional[str] = None
 
-class NotificationGroupCreate(NotificationGroupBase):
+class NotificationConfigCreate(NotificationConfigBase):
     pass
 
-class NotificationGroupResponse(NotificationGroupBase):
+class NotificationConfigResponse(NotificationConfigBase):
     id: int
 
     class Config:
@@ -24,7 +38,7 @@ class ServerBase(BaseModel):
     snmp_community: Optional[str] = "public"
     snmp_port: Optional[int] = 161
     snmp_version: Optional[str] = "2c"
-    notification_group_ids: List[int] = []
+    notification_ids: List[int] = []
     failed_threshold: int = 1
 
 class ServerCreate(ServerBase):
@@ -42,7 +56,7 @@ class ServerResponse(ServerBase):
     disk_usage: Optional[float] = None
     ram_total: Optional[float] = None
     disk_total: Optional[float] = None
-    notification_groups: List[NotificationGroupResponse] = []
+    notifications: List[NotificationConfigResponse] = []
 
     class Config:
         from_attributes = True
@@ -62,7 +76,7 @@ class PublicServerResponse(BaseModel):
     ram_total: Optional[float] = None
     disk_total: Optional[float] = None
     failed_threshold: int = 1
-    notification_groups: List[NotificationGroupResponse] = []
+    notifications: List[NotificationConfigResponse] = []
 
     class Config:
         from_attributes = True
@@ -109,7 +123,7 @@ class AgentMetricReport(BaseModel):
 class WebsiteBase(BaseModel):
     name: str
     url: str
-    notification_group_ids: List[int] = []
+    notification_ids: List[int] = []
     failed_threshold: int = 1
 
 class WebsiteCreate(WebsiteBase):
@@ -125,7 +139,7 @@ class WebsiteResponse(WebsiteBase):
     ssl_days_left: Optional[int] = None
     last_checked: Optional[datetime] = None
     error_message: Optional[str] = None
-    notification_groups: List[NotificationGroupResponse] = []
+    notifications: List[NotificationConfigResponse] = []
 
     class Config:
         from_attributes = True
@@ -140,6 +154,7 @@ class PublicWebsiteResponse(WebsiteBase):
     ssl_days_left: Optional[int] = None
     last_checked: Optional[datetime] = None
     error_message: Optional[str] = None
+    notifications: List[NotificationConfigResponse] = []
 
     class Config:
         from_attributes = True

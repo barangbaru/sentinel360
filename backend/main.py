@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from .database import engine, get_db, Base, SessionLocal
-from .models import Server, MetricHistory, Alert, User, Website, SystemSettings, NotificationGroup
+from .models import Server, MetricHistory, Alert, User, Website, SystemSettings, NotificationConfig
 from .schemas import (
     ServerCreate,
     ServerResponse,
@@ -26,8 +26,8 @@ from .schemas import (
     PublicWebsiteResponse,
     SystemSettingsResponse,
     SystemSettingsUpdate,
-    NotificationGroupCreate,
-    NotificationGroupResponse
+    NotificationConfigCreate,
+    NotificationConfigResponse
 )
 from .scheduler import start_scheduler
 
@@ -98,6 +98,94 @@ try:
         db.add(settings)
         print("Initial System Settings seeded.")
     db.commit()
+
+    # Startup settings migration to NotificationConfig
+    # 1. Telegram
+    if settings.telegram_enabled and settings.telegram_bot_token and settings.telegram_chat_id:
+        existing_tele = db.query(NotificationConfig).filter(NotificationConfig.name == "Telegram Global Migration").first()
+        if not existing_tele:
+            cfg = NotificationConfig(
+                name="Telegram Global Migration",
+                type="telegram",
+                is_enabled=True,
+                telegram_bot_token=settings.telegram_bot_token,
+                telegram_chat_id=settings.telegram_chat_id
+            )
+            db.add(cfg)
+            db.commit()
+            db.refresh(cfg)
+            print("Migration: Created Telegram Global Migration config.")
+            
+            # Associate to all existing servers and websites
+            all_servers = db.query(Server).all()
+            for s in all_servers:
+                if cfg not in s.notifications:
+                    s.notifications.append(cfg)
+            all_webs = db.query(Website).all()
+            for w in all_webs:
+                if cfg not in w.notifications:
+                    w.notifications.append(cfg)
+            db.commit()
+
+    # 2. SMTP
+    if settings.smtp_enabled and settings.smtp_host and settings.smtp_username and settings.smtp_password and settings.smtp_recipient:
+        existing_smtp = db.query(NotificationConfig).filter(NotificationConfig.name == "SMTP Global Migration").first()
+        if not existing_smtp:
+            cfg = NotificationConfig(
+                name="SMTP Global Migration",
+                type="smtp",
+                is_enabled=True,
+                smtp_host=settings.smtp_host,
+                smtp_port=settings.smtp_port,
+                smtp_username=settings.smtp_username,
+                smtp_password=settings.smtp_password,
+                smtp_sender=settings.smtp_sender,
+                smtp_recipient=settings.smtp_recipient
+            )
+            db.add(cfg)
+            db.commit()
+            db.refresh(cfg)
+            print("Migration: Created SMTP Global Migration config.")
+            
+            # Associate to all existing servers and websites
+            all_servers = db.query(Server).all()
+            for s in all_servers:
+                if cfg not in s.notifications:
+                    s.notifications.append(cfg)
+            all_webs = db.query(Website).all()
+            for w in all_webs:
+                if cfg not in w.notifications:
+                    w.notifications.append(cfg)
+            db.commit()
+
+    # 3. WhatsApp
+    if settings.whatsapp_enabled and settings.whatsapp_webhook_url and settings.whatsapp_recipients:
+        existing_wa = db.query(NotificationConfig).filter(NotificationConfig.name == "WhatsApp Global Migration").first()
+        if not existing_wa:
+            cfg = NotificationConfig(
+                name="WhatsApp Global Migration",
+                type="whatsapp",
+                is_enabled=True,
+                whatsapp_webhook_url=settings.whatsapp_webhook_url,
+                whatsapp_token=settings.whatsapp_token,
+                whatsapp_session_id=settings.whatsapp_session_id,
+                whatsapp_recipients=settings.whatsapp_recipients
+            )
+            db.add(cfg)
+            db.commit()
+            db.refresh(cfg)
+            print("Migration: Created WhatsApp Global Migration config.")
+            
+            # Associate to all existing servers and websites
+            all_servers = db.query(Server).all()
+            for s in all_servers:
+                if cfg not in s.notifications:
+                    s.notifications.append(cfg)
+            all_webs = db.query(Website).all()
+            for w in all_webs:
+                if cfg not in w.notifications:
+                    w.notifications.append(cfg)
+            db.commit()
 except Exception as e:
     print(f"Migration error: {e}")
 finally:
@@ -352,7 +440,7 @@ def create_server(
             detail=f"Server with IP address '{server_in.ip_address}' is already registered."
         )
         
-    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(server_in.notification_group_ids)).all()
+    groups = db.query(NotificationConfig).filter(NotificationConfig.id.in_(server_in.notification_ids)).all()
     db_server = Server(
         name=server_in.name,
         ip_address=server_in.ip_address,
@@ -361,7 +449,7 @@ def create_server(
         snmp_port=server_in.snmp_port,
         snmp_version=server_in.snmp_version,
         failed_threshold=server_in.failed_threshold,
-        notification_groups=groups,
+        notifications=groups,
         status="unknown"
     )
     db.add(db_server)
@@ -441,12 +529,12 @@ def create_website(
     if existing:
         raise HTTPException(status_code=400, detail="Website URL already registered")
         
-    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(website.notification_group_ids)).all()
+    groups = db.query(NotificationConfig).filter(NotificationConfig.id.in_(website.notification_ids)).all()
     db_website = Website(
         name=website.name,
         url=website.url,
         failed_threshold=website.failed_threshold,
-        notification_groups=groups,
+        notifications=groups,
         status="unknown"
     )
     db.add(db_website)
@@ -685,85 +773,111 @@ def test_system_settings(
     send_alert_notification(db, test_msg)
     return {"status": "ok", "message": "Test message sent to enabled channels."}
 
+
 # ==========================================
-# NOTIFICATION GROUPS ENDPOINTS
+# STANDALONE NOTIFICATION CONFIGS (UPTIME KUMA STYLE)
 # ==========================================
 
-@app.get("/api/notification-groups", response_model=List[NotificationGroupResponse])
-def list_notification_groups(
+@app.get("/api/notifications", response_model=List[NotificationConfigResponse])
+def list_notifications(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "view"]))
 ):
-    return db.query(NotificationGroup).all()
+    return db.query(NotificationConfig).all()
 
-@app.post("/api/notification-groups", response_model=NotificationGroupResponse)
-def create_notification_group(
-    group: NotificationGroupCreate,
+@app.post("/api/notifications", response_model=NotificationConfigResponse)
+def create_notification(
+    config: NotificationConfigCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin"]))
 ):
-    existing = db.query(NotificationGroup).filter(NotificationGroup.name == group.name).first()
+    existing = db.query(NotificationConfig).filter(NotificationConfig.name == config.name).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Nama group sudah digunakan")
-    db_group = NotificationGroup(
-        name=group.name,
-        telegram_chat_id=group.telegram_chat_id,
-        whatsapp_recipients=group.whatsapp_recipients,
-        smtp_recipient=group.smtp_recipient
-    )
-    db.add(db_group)
+        raise HTTPException(status_code=400, detail="Nama setting notifikasi sudah digunakan")
+    db_config = NotificationConfig(**config.model_dump())
+    db.add(db_config)
     db.commit()
-    db.refresh(db_group)
-    return db_group
+    db.refresh(db_config)
+    return db_config
 
-@app.delete("/api/notification-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_notification_group(
-    group_id: int,
+@app.put("/api/notifications/{config_id}", response_model=NotificationConfigResponse)
+def update_notification(
+    config_id: int,
+    config: NotificationConfigCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin"]))
 ):
-    db_group = db.query(NotificationGroup).filter(NotificationGroup.id == group_id).first()
-    if not db_group:
-        raise HTTPException(status_code=404, detail="Group notifikasi tidak ditemukan")
+    db_config = db.query(NotificationConfig).filter(NotificationConfig.id == config_id).first()
+    if not db_config:
+        raise HTTPException(status_code=404, detail="Setting notifikasi tidak ditemukan")
     
-    # Remove associations
-    db.execute(text("DELETE FROM server_notification_group WHERE notification_group_id = :gid"), {"gid": group_id})
-    db.execute(text("DELETE FROM website_notification_group WHERE notification_group_id = :gid"), {"gid": group_id})
+    # Update fields
+    for key, value in config.model_dump().items():
+        setattr(db_config, key, value)
     
-    # Set legacy reference to NULL
-    db.query(Server).filter(Server.notification_group_id == group_id).update({Server.notification_group_id: None})
-    db.query(Website).filter(Website.notification_group_id == group_id).update({Website.notification_group_id: None})
+    db.commit()
+    db.refresh(db_config)
+    return db_config
+
+@app.delete("/api/notifications/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification(
+    config_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    db_config = db.query(NotificationConfig).filter(NotificationConfig.id == config_id).first()
+    if not db_config:
+        raise HTTPException(status_code=404, detail="Setting notifikasi tidak ditemukan")
     
-    db.delete(db_group)
+    # Clean up associations
+    db.execute(text("DELETE FROM server_notification WHERE notification_id = :cid"), {"cid": config_id})
+    db.execute(text("DELETE FROM website_notification WHERE notification_id = :cid"), {"cid": config_id})
+    
+    db.delete(db_config)
     db.commit()
     return None
 
-@app.post("/api/servers/{server_id}/notification-groups", status_code=status.HTTP_200_OK)
-def update_server_notification_groups(
+@app.post("/api/notifications/{config_id}/test")
+def test_notification(
+    config_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    db_config = db.query(NotificationConfig).filter(NotificationConfig.id == config_id).first()
+    if not db_config:
+        raise HTTPException(status_code=404, detail="Setting notifikasi tidak ditemukan")
+    
+    from .notifications import send_alert_notification
+    test_msg = f"Uji Coba Notifikasi dari Sentinel360 untuk provider: {db_config.name}"
+    send_alert_notification(db, test_msg, db_config.id)
+    return {"status": "ok", "message": "Test message sent to the provider channel."}
+
+@app.post("/api/servers/{server_id}/notifications", status_code=status.HTTP_200_OK)
+def update_server_notifications(
     server_id: int,
-    group_ids: List[int],
+    notification_ids: List[int],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin"]))
 ):
     server = db.query(Server).filter(Server.id == server_id).first()
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(group_ids)).all()
-    server.notification_groups = groups
+    configs = db.query(NotificationConfig).filter(NotificationConfig.id.in_(notification_ids)).all()
+    server.notifications = configs
     db.commit()
-    return {"status": "ok", "message": "Notification groups updated successfully"}
+    return {"status": "ok", "message": "Notifications updated successfully"}
 
-@app.post("/api/websites/{website_id}/notification-groups", status_code=status.HTTP_200_OK)
-def update_website_notification_groups(
+@app.post("/api/websites/{website_id}/notifications", status_code=status.HTTP_200_OK)
+def update_website_notifications(
     website_id: int,
-    group_ids: List[int],
+    notification_ids: List[int],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin"]))
 ):
     website = db.query(Website).filter(Website.id == website_id).first()
     if not website:
         raise HTTPException(status_code=404, detail="Website not found")
-    groups = db.query(NotificationGroup).filter(NotificationGroup.id.in_(group_ids)).all()
-    website.notification_groups = groups
+    configs = db.query(NotificationConfig).filter(NotificationConfig.id.in_(notification_ids)).all()
+    website.notifications = configs
     db.commit()
-    return {"status": "ok", "message": "Notification groups updated successfully"}
+    return {"status": "ok", "message": "Notifications updated successfully"}

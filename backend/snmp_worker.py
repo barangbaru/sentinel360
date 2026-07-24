@@ -150,9 +150,9 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 db.add(alert)
                 logger.warning(f"ALERT: SNMP Server {server.name} went offline.")
                 from .notifications import send_alert_notification
-                if server.notification_groups:
-                    for group in server.notification_groups:
-                        send_alert_notification(db, alert_msg, group.id)
+                if server.notifications:
+                    for config in server.notifications:
+                        send_alert_notification(db, alert_msg, config.id)
                 else:
                     send_alert_notification(db, alert_msg, None)
         else:
@@ -265,9 +265,9 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
             alert.resolved_at = datetime.utcnow()
         logger.info(f"SNMP Server {server.name} came back online. Resolved active alerts.")
         from .notifications import send_alert_notification
-        if server.notification_groups:
-            for group in server.notification_groups:
-                send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", group.id)
+        if server.notifications:
+            for config in server.notifications:
+                send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", config.id)
         else:
             send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", None)
         
@@ -288,9 +288,9 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 resolved=False
             ))
             from .notifications import send_alert_notification
-            if server.notification_groups:
-                for group in server.notification_groups:
-                    send_alert_notification(db, msg, group.id)
+            if server.notifications:
+                for config in server.notifications:
+                    send_alert_notification(db, msg, config.id)
             else:
                 send_alert_notification(db, msg, None)
             
@@ -309,9 +309,9 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 resolved=False
             ))
             from .notifications import send_alert_notification
-            if server.notification_groups:
-                for group in server.notification_groups:
-                    send_alert_notification(db, msg, group.id)
+            if server.notifications:
+                for config in server.notifications:
+                    send_alert_notification(db, msg, config.id)
             else:
                 send_alert_notification(db, msg, None)
 

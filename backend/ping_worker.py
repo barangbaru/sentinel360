@@ -119,9 +119,9 @@ def ping_server(db: Session, server: Server):
             
             # Send resolution alert
             from .notifications import send_alert_notification
-            if server.notification_groups:
-                for group in server.notification_groups:
-                    send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", group.id)
+            if server.notifications:
+                for config in server.notifications:
+                    send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", config.id)
             else:
                 send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", None)
         else:
@@ -148,9 +148,9 @@ def ping_server(db: Session, server: Server):
                 
                 # Send alert
                 from .notifications import send_alert_notification
-                if server.notification_groups:
-                    for group in server.notification_groups:
-                        send_alert_notification(db, alert_msg, group.id)
+                if server.notifications:
+                    for config in server.notifications:
+                        send_alert_notification(db, alert_msg, config.id)
                 else:
                     send_alert_notification(db, alert_msg, None)
         else:

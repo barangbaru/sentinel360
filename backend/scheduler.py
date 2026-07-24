@@ -78,9 +78,9 @@ def scheduler_loop():
                                 
                                 # Send alert
                                 from .notifications import send_alert_notification
-                                if server.notification_groups:
-                                    for group in server.notification_groups:
-                                        send_alert_notification(db, alert_msg, group.id)
+                                if server.notifications:
+                                    for config in server.notifications:
+                                        send_alert_notification(db, alert_msg, config.id)
                                 else:
                                     send_alert_notification(db, alert_msg, None)
                                 

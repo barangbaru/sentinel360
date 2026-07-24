@@ -5,27 +5,44 @@ from sqlalchemy.orm import relationship
 from .database import Base
 from sqlalchemy import Table
 
-server_notification_group = Table(
-    "server_notification_group",
+server_notification = Table(
+    "server_notification",
     Base.metadata,
     Column("server_id", Integer, ForeignKey("servers.id", ondelete="CASCADE"), primary_key=True),
-    Column("notification_group_id", Integer, ForeignKey("notification_groups.id", ondelete="CASCADE"), primary_key=True)
+    Column("notification_id", Integer, ForeignKey("notification_configs.id", ondelete="CASCADE"), primary_key=True)
 )
 
-website_notification_group = Table(
-    "website_notification_group",
+website_notification = Table(
+    "website_notification",
     Base.metadata,
     Column("website_id", Integer, ForeignKey("websites.id", ondelete="CASCADE"), primary_key=True),
-    Column("notification_group_id", Integer, ForeignKey("notification_groups.id", ondelete="CASCADE"), primary_key=True)
+    Column("notification_id", Integer, ForeignKey("notification_configs.id", ondelete="CASCADE"), primary_key=True)
 )
 
-class NotificationGroup(Base):
-    __tablename__ = "notification_groups"
+class NotificationConfig(Base):
+    __tablename__ = "notification_configs"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True, index=True)
+    type = Column(String, nullable=False)  # "telegram", "whatsapp", "smtp"
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    
+    # Telegram settings
+    telegram_bot_token = Column(String, nullable=True)
     telegram_chat_id = Column(String, nullable=True)
+    
+    # WhatsApp settings
+    whatsapp_webhook_url = Column(String, nullable=True)
+    whatsapp_token = Column(String, nullable=True)
+    whatsapp_session_id = Column(String, nullable=True)
     whatsapp_recipients = Column(String, nullable=True)
+    
+    # SMTP settings
+    smtp_host = Column(String, nullable=True)
+    smtp_port = Column(Integer, default=587, nullable=True)
+    smtp_username = Column(String, nullable=True)
+    smtp_password = Column(String, nullable=True)
+    smtp_sender = Column(String, nullable=True)
     smtp_recipient = Column(String, nullable=True)
 
 class Server(Base):
@@ -61,7 +78,7 @@ class Server(Base):
     failed_threshold = Column(Integer, default=1, nullable=False)
     consecutive_failures = Column(Integer, default=0, nullable=False)
 
-    notification_groups = relationship("NotificationGroup", secondary=server_notification_group)
+    notifications = relationship("NotificationConfig", secondary=server_notification)
 
 class MetricHistory(Base):
     __tablename__ = "metric_history"
@@ -122,7 +139,7 @@ class Website(Base):
     failed_threshold = Column(Integer, default=1, nullable=False)
     consecutive_failures = Column(Integer, default=0, nullable=False)
 
-    notification_groups = relationship("NotificationGroup", secondary=website_notification_group)
+    notifications = relationship("NotificationConfig", secondary=website_notification)
 
 class SystemSettings(Base):
     __tablename__ = "system_settings"

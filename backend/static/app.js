@@ -179,39 +179,206 @@ function initDashboard() {
         }
     }
 
-    window.deleteNotificationGroup = async function(groupId) {
-        if (!confirm("Apakah Anda yakin ingin menghapus group notifikasi ini?")) return;
-        try {
-            const res = await fetch(`/api/notification-groups/${groupId}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Gagal menghapus group notifikasi.");
-            await loadNotificationGroups();
-        } catch (error) {
-            alert("Error: " + error.message);
+    // Type selection toggle inside modal
+    const typeSelect = document.getElementById("new_notification_type");
+    if (typeSelect) {
+        typeSelect.addEventListener("change", () => {
+            const val = typeSelect.value;
+            document.getElementById("setup-telegram-fields").style.display = val === "telegram" ? "block" : "none";
+            document.getElementById("setup-whatsapp-fields").style.display = val === "whatsapp" ? "block" : "none";
+            document.getElementById("setup-smtp-fields").style.display = val === "smtp" ? "block" : "none";
+        });
+    }
+
+    // Reset notification setup form
+    window.resetNotificationForm = function() {
+        const form = document.getElementById("notification-provider-form");
+        if (form) form.reset();
+        document.getElementById("edit_notification_id").value = "";
+        document.getElementById("setup-form-title").textContent = "Buat Setup Notifikasi Baru";
+        document.getElementById("test-notification-btn").style.display = "none";
+        document.getElementById("cancel-edit-notification-btn").style.display = "none";
+        
+        // Reset sub-section visibility
+        if (typeSelect) {
+            typeSelect.value = "telegram";
+            document.getElementById("setup-telegram-fields").style.display = "block";
+            document.getElementById("setup-whatsapp-fields").style.display = "none";
+            document.getElementById("setup-smtp-fields").style.display = "none";
         }
     };
 
-    window.manageWebsiteGroups = async function(webId) {
+    // Edit Notification Setup
+    window.editNotificationConfig = async function(id) {
+        try {
+            const res = await fetch("/api/notifications");
+            if (!res.ok) throw new Error("Gagal mengambil data setups.");
+            const configs = await res.json();
+            const config = configs.find(c => c.id === id);
+            if (!config) return;
+
+            document.getElementById("edit_notification_id").value = config.id;
+            document.getElementById("new_notification_name").value = config.name;
+            typeSelect.value = config.type;
+            
+            // Toggle visibility
+            document.getElementById("setup-telegram-fields").style.display = config.type === "telegram" ? "block" : "none";
+            document.getElementById("setup-whatsapp-fields").style.display = config.type === "whatsapp" ? "block" : "none";
+            document.getElementById("setup-smtp-fields").style.display = config.type === "smtp" ? "block" : "none";
+
+            // Populate fields
+            document.getElementById("new_tele_bot_token").value = config.telegram_bot_token || "";
+            document.getElementById("new_tele_chat_id").value = config.telegram_chat_id || "";
+            
+            document.getElementById("new_wa_webhook_url").value = config.whatsapp_webhook_url || "";
+            document.getElementById("new_wa_token").value = config.whatsapp_token || "";
+            document.getElementById("new_wa_session_id").value = config.whatsapp_session_id || "";
+            document.getElementById("new_wa_recipients").value = config.whatsapp_recipients || "";
+            
+            document.getElementById("new_smtp_host").value = config.smtp_host || "";
+            document.getElementById("new_smtp_port").value = config.smtp_port || 587;
+            document.getElementById("new_smtp_username").value = config.smtp_username || "";
+            document.getElementById("new_smtp_password").value = config.smtp_password || "";
+            document.getElementById("new_smtp_sender").value = config.smtp_sender || "";
+            document.getElementById("new_smtp_recipient").value = config.smtp_recipient || "";
+
+            // Update form display state
+            document.getElementById("setup-form-title").textContent = "Edit Setup Notifikasi";
+            document.getElementById("test-notification-btn").style.display = "block";
+            document.getElementById("cancel-edit-notification-btn").style.display = "block";
+        } catch (error) {
+            alert(error.message);
+        }
+    };
+
+    // Delete Notification Setup
+    window.deleteNotificationConfig = async function(id) {
+        if (!confirm("Apakah Anda yakin ingin menghapus setup notifikasi ini?")) return;
+        try {
+            const res = await fetch(`/api/notifications/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Gagal menghapus setup notifikasi.");
+            resetNotificationForm();
+            await loadNotificationGroups();
+        } catch (error) {
+            alert(error.message);
+        }
+    };
+
+    // Save Notification Setup
+    const saveNotificationBtn = document.getElementById("save-notification-btn");
+    if (saveNotificationBtn) {
+        saveNotificationBtn.addEventListener("click", async () => {
+            const id = document.getElementById("edit_notification_id").value;
+            const name = document.getElementById("new_notification_name").value;
+            const type = typeSelect.value;
+            
+            if (!name) {
+                alert("Nama setup wajib diisi!");
+                return;
+            }
+
+            const payload = {
+                name: name,
+                type: type,
+                is_enabled: true,
+                telegram_bot_token: document.getElementById("new_tele_bot_token").value || null,
+                telegram_chat_id: document.getElementById("new_tele_chat_id").value || null,
+                whatsapp_webhook_url: document.getElementById("new_wa_webhook_url").value || null,
+                whatsapp_token: document.getElementById("new_wa_token").value || null,
+                whatsapp_session_id: document.getElementById("new_wa_session_id").value || null,
+                whatsapp_recipients: document.getElementById("new_wa_recipients").value || null,
+                smtp_host: document.getElementById("new_smtp_host").value || null,
+                smtp_port: parseInt(document.getElementById("new_smtp_port").value, 10) || 587,
+                smtp_username: document.getElementById("new_smtp_username").value || null,
+                smtp_password: document.getElementById("new_smtp_password").value || null,
+                smtp_sender: document.getElementById("new_smtp_sender").value || null,
+                smtp_recipient: document.getElementById("new_smtp_recipient").value || null
+            };
+
+            try {
+                let res;
+                if (id) {
+                    // Update
+                    res = await fetch(`/api/notifications/${id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    // Create
+                    res = await fetch("/api/notifications", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Gagal menyimpan setup notifikasi.");
+                }
+
+                alert("Setup notifikasi berhasil disimpan!");
+                resetNotificationForm();
+                await loadNotificationGroups();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+    }
+
+    // Cancel Edit
+    const cancelEditBtn = document.getElementById("cancel-edit-notification-btn");
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener("click", () => {
+            resetNotificationForm();
+        });
+    }
+
+    // Test Setup
+    const testNotificationBtn = document.getElementById("test-notification-btn");
+    if (testNotificationBtn) {
+        testNotificationBtn.addEventListener("click", async () => {
+            const id = document.getElementById("edit_notification_id").value;
+            if (!id) return;
+            testNotificationBtn.disabled = true;
+            const originalText = testNotificationBtn.textContent;
+            testNotificationBtn.textContent = "Mengirim...";
+            try {
+                const res = await fetch(`/api/notifications/${id}/test`, { method: "POST" });
+                if (!res.ok) throw new Error("Gagal mengirim notifikasi uji coba.");
+                alert("Notifikasi uji coba berhasil dikirim ke saluran setup ini!");
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                testNotificationBtn.disabled = false;
+                testNotificationBtn.textContent = originalText;
+            }
+        });
+    }
+
+    window.manageWebsiteNotifications = async function(webId) {
         const modal = document.getElementById("manage-website-groups-modal");
         const container = document.getElementById("web-groups-checklist");
         document.getElementById("manage_web_id").value = webId;
 
-        // Fetch groups
+        // Fetch configs
         try {
-            const gRes = await fetch("/api/notification-groups");
-            if (!gRes.ok) throw new Error("Gagal mengambil data group.");
-            const allGroups = await gRes.json();
+            const gRes = await fetch("/api/notifications");
+            if (!gRes.ok) throw new Error("Gagal mengambil data setup.");
+            const allConfigs = await gRes.json();
 
-            // Fetch website current active groups
+            // Fetch website current active notifications
             const web = cachedWebsites.find(w => w.id === webId);
-            const activeGroupIds = (web && web.notification_groups) ? web.notification_groups.map(g => g.id) : [];
+            const activeIds = (web && web.notifications) ? web.notifications.map(n => n.id) : [];
 
-            if (allGroups.length === 0) {
-                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">Belum ada group notifikasi kustom. Silakan buat di Alarm Settings.</p>';
+            if (allConfigs.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">Belum ada setup notifikasi. Silakan buat di menu Notifikasi.</p>';
             } else {
-                container.innerHTML = allGroups.map(g => `
+                container.innerHTML = allConfigs.map(c => `
                     <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; border: 1px solid var(--border-color); padding: 0.4rem; border-radius: 4px; background: rgba(255,255,255,0.01);">
-                        <input type="checkbox" name="manage_web_group_id" value="${g.id}" ${activeGroupIds.includes(g.id) ? 'checked' : ''}>
-                        <strong>${g.name}</strong>
+                        <input type="checkbox" name="manage_web_group_id" value="${c.id}" ${activeIds.includes(c.id) ? 'checked' : ''}>
+                        <strong>${c.name}</strong> (${c.type.toUpperCase()})
                     </label>
                 `).join("");
             }
@@ -237,18 +404,18 @@ function initDashboard() {
         saveWebGroupsBtn.addEventListener("click", async () => {
             const webId = document.getElementById("manage_web_id").value;
             const checkedBoxes = document.querySelectorAll('input[name="manage_web_group_id"]:checked');
-            const groupIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
+            const notificationIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
 
             try {
-                const res = await fetch(`/api/websites/${webId}/notification-groups`, {
+                const res = await fetch(`/api/websites/${webId}/notifications`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(groupIds)
+                    body: JSON.stringify(notificationIds)
                 });
-                if (!res.ok) throw new Error("Gagal menyimpan pengaturan group.");
+                if (!res.ok) throw new Error("Gagal menyimpan pengaturan notifikasi.");
 
                 webGroupsModal.close();
-                alert("Pengaturan group berhasil disimpan!");
+                alert("Pengaturan notifikasi berhasil disimpan!");
                 loadWebsites();
             } catch (error) {
                 alert("Error: " + error.message);
@@ -256,44 +423,7 @@ function initDashboard() {
         });
     }
 
-    const createGroupBtn = document.getElementById("create-group-btn");
-    if (createGroupBtn) {
-        createGroupBtn.addEventListener("click", async () => {
-            const name = document.getElementById("new_group_name").value;
-            const telegram_chat_id = document.getElementById("new_group_telegram").value || null;
-            const whatsapp_recipients = document.getElementById("new_group_whatsapp").value || null;
-            const smtp_recipient = document.getElementById("new_group_smtp").value || null;
-            
-            if (!name) {
-                alert("Nama group wajib diisi.");
-                return;
-            }
-            
-            try {
-                const res = await fetch("/api/notification-groups", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name, telegram_chat_id, whatsapp_recipients, smtp_recipient })
-                });
-                if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.detail || "Gagal membuat group notifikasi.");
-                }
-                
-                // Clear fields
-                document.getElementById("new_group_name").value = "";
-                document.getElementById("new_group_telegram").value = "";
-                document.getElementById("new_group_whatsapp").value = "";
-                document.getElementById("new_group_smtp").value = "";
-                
-                await loadNotificationGroups();
-            } catch (error) {
-                alert("Error: " + error.message);
-            }
-        });
-    }
-
-    // Load notification groups on initial load
+    // Load configurations on initial load
     loadNotificationGroups();
 
     let cachedServers = [];
@@ -681,137 +811,19 @@ function initDashboard() {
     // Alarm Settings Modal Elements
     const alarmSettingsBtn = document.getElementById("settings-alarm-btn");
     const alarmSettingsModal = document.getElementById("alarm-settings-modal");
-    const alarmSettingsForm = document.getElementById("alarm-settings-form");
     const cancelAlarmSettingsBtn = document.getElementById("cancel-alarm-settings-btn");
-    const testAlarmBtn = document.getElementById("test-alarm-btn");
 
     if (alarmSettingsBtn && alarmSettingsModal) {
         alarmSettingsBtn.addEventListener("click", async () => {
-            try {
-                const res = await fetch("/api/settings");
-                if (res.status === 401) {
-                    window.location.href = "/login";
-                    return;
-                }
-                if (!res.ok) throw new Error("Gagal mengambil data pengaturan alarm.");
-                const settings = await res.json();
-                
-                document.getElementById("telegram_enabled").checked = settings.telegram_enabled;
-                document.getElementById("telegram_bot_token").value = settings.telegram_bot_token || "";
-                document.getElementById("telegram_chat_id").value = settings.telegram_chat_id || "";
-                
-                document.getElementById("whatsapp_enabled").checked = settings.whatsapp_enabled;
-                document.getElementById("whatsapp_webhook_url").value = settings.whatsapp_webhook_url || "";
-                document.getElementById("whatsapp_token").value = settings.whatsapp_token || "";
-                document.getElementById("whatsapp_session_id").value = settings.whatsapp_session_id || "";
-                document.getElementById("whatsapp_recipients").value = settings.whatsapp_recipients || "";
-                
-                document.getElementById("smtp_enabled").checked = settings.smtp_enabled;
-                document.getElementById("smtp_host").value = settings.smtp_host || "";
-                document.getElementById("smtp_port").value = settings.smtp_port || 587;
-                document.getElementById("smtp_username").value = settings.smtp_username || "";
-                document.getElementById("smtp_password").value = settings.smtp_password || "";
-                document.getElementById("smtp_sender").value = settings.smtp_sender || "";
-                document.getElementById("smtp_recipient").value = settings.smtp_recipient || "";
-                
-                // Load custom notification groups
-                await loadNotificationGroups();
-                
-                alarmSettingsModal.showModal();
-            } catch (error) {
-                alert("Error: " + error.message);
-            }
+            resetNotificationForm();
+            await loadNotificationGroups();
+            alarmSettingsModal.showModal();
         });
     }
 
     if (cancelAlarmSettingsBtn && alarmSettingsModal) {
         cancelAlarmSettingsBtn.addEventListener("click", () => {
             alarmSettingsModal.close();
-        });
-    }
-
-    if (alarmSettingsForm && alarmSettingsModal) {
-        alarmSettingsForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            
-            const payload = {
-                telegram_enabled: document.getElementById("telegram_enabled").checked,
-                telegram_bot_token: document.getElementById("telegram_bot_token").value || null,
-                telegram_chat_id: document.getElementById("telegram_chat_id").value || null,
-                
-                whatsapp_enabled: document.getElementById("whatsapp_enabled").checked,
-                whatsapp_webhook_url: document.getElementById("whatsapp_webhook_url").value || null,
-                whatsapp_token: document.getElementById("whatsapp_token").value || null,
-                whatsapp_session_id: document.getElementById("whatsapp_session_id").value || null,
-                whatsapp_recipients: document.getElementById("whatsapp_recipients").value || null,
-                
-                smtp_enabled: document.getElementById("smtp_enabled").checked,
-                smtp_host: document.getElementById("smtp_host").value || null,
-                smtp_port: parseInt(document.getElementById("smtp_port").value, 10) || 587,
-                smtp_username: document.getElementById("smtp_username").value || null,
-                smtp_password: document.getElementById("smtp_password").value || null,
-                smtp_sender: document.getElementById("smtp_sender").value || null,
-                smtp_recipient: document.getElementById("smtp_recipient").value || null
-            };
-            
-            try {
-                const res = await fetch("/api/settings", {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                if (!res.ok) throw new Error("Gagal menyimpan pengaturan alarm.");
-                
-                alarmSettingsModal.close();
-                alert("Pengaturan alarm berhasil disimpan!");
-            } catch (error) {
-                alert("Error: " + error.message);
-            }
-        });
-    }
-
-    if (testAlarmBtn) {
-        testAlarmBtn.addEventListener("click", async () => {
-            testAlarmBtn.disabled = true;
-            const originalText = testAlarmBtn.textContent;
-            testAlarmBtn.textContent = "Mengirim...";
-            try {
-                const payload = {
-                    telegram_enabled: document.getElementById("telegram_enabled").checked,
-                    telegram_bot_token: document.getElementById("telegram_bot_token").value || null,
-                    telegram_chat_id: document.getElementById("telegram_chat_id").value || null,
-                    
-                    whatsapp_enabled: document.getElementById("whatsapp_enabled").checked,
-                    whatsapp_webhook_url: document.getElementById("whatsapp_webhook_url").value || null,
-                    whatsapp_token: document.getElementById("whatsapp_token").value || null,
-                    whatsapp_session_id: document.getElementById("whatsapp_session_id").value || null,
-                    whatsapp_recipients: document.getElementById("whatsapp_recipients").value || null,
-                    
-                    smtp_enabled: document.getElementById("smtp_enabled").checked,
-                    smtp_host: document.getElementById("smtp_host").value || null,
-                    smtp_port: parseInt(document.getElementById("smtp_port").value, 10) || 587,
-                    smtp_username: document.getElementById("smtp_username").value || null,
-                    smtp_password: document.getElementById("smtp_password").value || null,
-                    smtp_sender: document.getElementById("smtp_sender").value || null,
-                    smtp_recipient: document.getElementById("smtp_recipient").value || null
-                };
-                
-                const saveRes = await fetch("/api/settings", {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                if (!saveRes.ok) throw new Error("Gagal menyimpan pengaturan sebelum uji coba.");
-
-                const res = await fetch("/api/settings/test", { method: "POST" });
-                if (!res.ok) throw new Error("Gagal mengirim notifikasi uji coba.");
-                alert("Notifikasi uji coba berhasil dikirim ke saluran yang aktif!");
-            } catch (error) {
-                alert("Error: " + error.message);
-            } finally {
-                testAlarmBtn.disabled = false;
-                testAlarmBtn.textContent = originalText;
-            }
         });
     }
 
