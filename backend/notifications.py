@@ -9,21 +9,39 @@ from .models import SystemSettings
 
 logger = logging.getLogger("Notifications")
 
-def send_alert_notification(db: Session, message: str):
+def send_alert_notification(db: Session, message: str, notification_group_id: Optional[int] = None):
     """
     Sends downtime alerts via active notification channels (SMTP, Telegram, WhatsApp Webhook).
+    Supports routing via NotificationGroup overrides if provided.
     """
+    from typing import Optional
     settings = db.query(SystemSettings).first()
     if not settings:
         logger.warning("No system settings found to send notifications.")
         return
 
+    # Check for custom notification group overrides
+    telegram_chat_id = settings.telegram_chat_id
+    whatsapp_recipients = settings.whatsapp_recipients
+    smtp_recipient = settings.smtp_recipient
+
+    if notification_group_id:
+        from .models import NotificationGroup
+        group = db.query(NotificationGroup).filter(NotificationGroup.id == notification_group_id).first()
+        if group:
+            if group.telegram_chat_id:
+                telegram_chat_id = group.telegram_chat_id
+            if group.whatsapp_recipients:
+                whatsapp_recipients = group.whatsapp_recipients
+            if group.smtp_recipient:
+                smtp_recipient = group.smtp_recipient
+
     # 1. Telegram Notification
-    if settings.telegram_enabled and settings.telegram_bot_token and settings.telegram_chat_id:
+    if settings.telegram_enabled and settings.telegram_bot_token and telegram_chat_id:
         try:
             url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
             payload = {
-                "chat_id": settings.telegram_chat_id,
+                "chat_id": telegram_chat_id,
                 "text": f"⚠️ *Sentinel360 ALERT*\n\n{message}",
                 "parse_mode": "Markdown"
             }
@@ -54,8 +72,8 @@ def send_alert_notification(db: Session, message: str):
             
             # Process multiple recipient phone numbers
             recipients = []
-            if settings.whatsapp_recipients:
-                recipients = [r.strip() for r in settings.whatsapp_recipients.split(",") if r.strip()]
+            if whatsapp_recipients:
+                recipients = [r.strip() for r in whatsapp_recipients.split(",") if r.strip()]
             
             if not recipients:
                 logger.warning("WhatsApp is enabled but no recipients are configured.")
@@ -86,11 +104,11 @@ def send_alert_notification(db: Session, message: str):
             logger.error(f"Error sending WhatsApp notification: {e}")
 
     # 3. SMTP Email Notification
-    if settings.smtp_enabled and settings.smtp_host and settings.smtp_username and settings.smtp_password and settings.smtp_recipient:
+    if settings.smtp_enabled and settings.smtp_host and settings.smtp_username and settings.smtp_password and smtp_recipient:
         try:
             msg = MIMEMultipart()
             msg["From"] = settings.smtp_sender or settings.smtp_username
-            msg["To"] = settings.smtp_recipient
+            msg["To"] = smtp_recipient
             msg["Subject"] = "⚠️ Sentinel360 ALERT"
 
             body = f"Hello,\n\nSentinel360 has detected a monitoring event:\n\n{message}\n\nRegards,\nSentinel360 Monitoring System"

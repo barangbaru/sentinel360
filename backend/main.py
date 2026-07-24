@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from .database import engine, get_db, Base, SessionLocal
-from .models import Server, MetricHistory, Alert, User, Website, SystemSettings
+from .models import Server, MetricHistory, Alert, User, Website, SystemSettings, NotificationGroup
 from .schemas import (
     ServerCreate,
     ServerResponse,
@@ -25,30 +25,43 @@ from .schemas import (
     WebsiteResponse,
     PublicWebsiteResponse,
     SystemSettingsResponse,
-    SystemSettingsUpdate
+    SystemSettingsUpdate,
+    NotificationGroupCreate,
+    NotificationGroupResponse
 )
 from .scheduler import start_scheduler
 
 # Create the SQLite tables
 Base.metadata.create_all(bind=engine)
 
-# Add missing columns dynamically for SQLite if they don't exist
+# Add missing columns dynamically if they don't exist
 db = SessionLocal()
 try:
-    from sqlalchemy import text
+    from sqlalchemy import text, inspect
     from .models import SystemSettings
-    # Fetch column names
-    res = db.execute(text("PRAGMA table_info(servers)")).fetchall()
-    columns = [row[1] for row in res]
-    if "ram_total" not in columns:
+    
+    inspector = inspect(engine)
+    
+    # 1. Migrate servers columns
+    servers_cols = [col["name"] for col in inspector.get_columns("servers")]
+    if "ram_total" not in servers_cols:
         db.execute(text("ALTER TABLE servers ADD COLUMN ram_total FLOAT"))
         print("Migration: Added ram_total column to servers table.")
-    if "disk_total" not in columns:
+    if "disk_total" not in servers_cols:
         db.execute(text("ALTER TABLE servers ADD COLUMN disk_total FLOAT"))
         print("Migration: Added disk_total column to servers table.")
+    if "notification_group_id" not in servers_cols:
+        db.execute(text("ALTER TABLE servers ADD COLUMN notification_group_id INTEGER"))
+        print("Migration: Added notification_group_id column to servers table.")
+    if "failed_threshold" not in servers_cols:
+        db.execute(text("ALTER TABLE servers ADD COLUMN failed_threshold INTEGER DEFAULT 1"))
+        print("Migration: Added failed_threshold column to servers table.")
+    if "consecutive_failures" not in servers_cols:
+        db.execute(text("ALTER TABLE servers ADD COLUMN consecutive_failures INTEGER DEFAULT 0"))
+        print("Migration: Added consecutive_failures column to servers table.")
         
-    res_alerts = db.execute(text("PRAGMA table_info(alerts)")).fetchall()
-    alerts_cols = [row[1] for row in res_alerts]
+    # 2. Migrate alerts columns
+    alerts_cols = [col["name"] for col in inspector.get_columns("alerts")]
     if "website_id" not in alerts_cols:
         db.execute(text("ALTER TABLE alerts ADD COLUMN website_id INTEGER"))
         print("Migration: Added website_id column to alerts table.")
@@ -56,14 +69,27 @@ try:
         db.execute(text("ALTER TABLE alerts ADD COLUMN resolved_at DATETIME"))
         print("Migration: Added resolved_at column to alerts table.")
         
-    res_settings = db.execute(text("PRAGMA table_info(system_settings)")).fetchall()
-    settings_cols = [row[1] for row in res_settings]
+    # 3. Migrate system_settings columns
+    settings_cols = [col["name"] for col in inspector.get_columns("system_settings")]
     if "whatsapp_session_id" not in settings_cols:
         db.execute(text("ALTER TABLE system_settings ADD COLUMN whatsapp_session_id VARCHAR"))
         print("Migration: Added whatsapp_session_id column to system_settings.")
     if "whatsapp_recipients" not in settings_cols:
         db.execute(text("ALTER TABLE system_settings ADD COLUMN whatsapp_recipients VARCHAR"))
         print("Migration: Added whatsapp_recipients column to system_settings.")
+
+    # 4. Migrate websites columns
+    if inspector.has_table("websites"):
+        websites_cols = [col["name"] for col in inspector.get_columns("websites")]
+        if "notification_group_id" not in websites_cols:
+            db.execute(text("ALTER TABLE websites ADD COLUMN notification_group_id INTEGER"))
+            print("Migration: Added notification_group_id column to websites table.")
+        if "failed_threshold" not in websites_cols:
+            db.execute(text("ALTER TABLE websites ADD COLUMN failed_threshold INTEGER DEFAULT 1"))
+            print("Migration: Added failed_threshold column to websites table.")
+        if "consecutive_failures" not in websites_cols:
+            db.execute(text("ALTER TABLE websites ADD COLUMN consecutive_failures INTEGER DEFAULT 0"))
+            print("Migration: Added consecutive_failures column to websites table.")
 
     # Seed default system settings
     settings = db.query(SystemSettings).first()
@@ -333,6 +359,8 @@ def create_server(
         snmp_community=server_in.snmp_community,
         snmp_port=server_in.snmp_port,
         snmp_version=server_in.snmp_version,
+        notification_group_id=server_in.notification_group_id,
+        failed_threshold=server_in.failed_threshold,
         status="unknown"
     )
     db.add(db_server)
@@ -415,6 +443,8 @@ def create_website(
     db_website = Website(
         name=website.name,
         url=website.url,
+        notification_group_id=website.notification_group_id,
+        failed_threshold=website.failed_threshold,
         status="unknown"
     )
     db.add(db_website)
@@ -652,3 +682,52 @@ def test_system_settings(
     test_msg = "Ini adalah notifikasi uji coba dari Sentinel360 Monitoring!"
     send_alert_notification(db, test_msg)
     return {"status": "ok", "message": "Test message sent to enabled channels."}
+
+# ==========================================
+# NOTIFICATION GROUPS ENDPOINTS
+# ==========================================
+
+@app.get("/api/notification-groups", response_model=List[NotificationGroupResponse])
+def list_notification_groups(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "view"]))
+):
+    return db.query(NotificationGroup).all()
+
+@app.post("/api/notification-groups", response_model=NotificationGroupResponse)
+def create_notification_group(
+    group: NotificationGroupCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    existing = db.query(NotificationGroup).filter(NotificationGroup.name == group.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Nama group sudah digunakan")
+    db_group = NotificationGroup(
+        name=group.name,
+        telegram_chat_id=group.telegram_chat_id,
+        whatsapp_recipients=group.whatsapp_recipients,
+        smtp_recipient=group.smtp_recipient
+    )
+    db.add(db_group)
+    db.commit()
+    db.refresh(db_group)
+    return db_group
+
+@app.delete("/api/notification-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification_group(
+    group_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
+    db_group = db.query(NotificationGroup).filter(NotificationGroup.id == group_id).first()
+    if not db_group:
+        raise HTTPException(status_code=404, detail="Group notifikasi tidak ditemukan")
+    
+    # Set references in servers and websites to NULL
+    db.query(Server).filter(Server.notification_group_id == group_id).update({Server.notification_group_id: None})
+    db.query(Website).filter(Website.notification_group_id == group_id).update({Website.notification_group_id: None})
+    
+    db.delete(db_group)
+    db.commit()
+    return None

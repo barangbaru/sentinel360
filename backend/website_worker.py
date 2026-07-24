@@ -46,15 +46,15 @@ def check_website(db, website):
         website.response_time = round(latency_ms, 2)
         
         if 200 <= response.status_code < 400:
-            website.status = "online"
+            is_check_success = True
             website.error_message = None
         else:
-            website.status = "offline"
+            is_check_success = False
             website.error_message = f"HTTP Error Status Code: {response.status_code}"
             
     except requests.exceptions.RequestException as e:
+        is_check_success = False
         latency_ms = (time.time() - start_time) * 1000
-        website.status = "offline"
         website.status_code = None
         website.response_time = round(latency_ms, 2)
         website.error_message = str(e)
@@ -90,30 +90,41 @@ def check_website(db, website):
     website.last_checked = datetime.utcnow()
     
     # Handle Alerts
-    is_online = website.status == "online"
     from .models import Alert
     
-    if was_online and not is_online:
-        alert_msg = f"Website {website.name} ({website.url}) is OFFLINE (HTTP: {website.status_code or 'FAIL'})"
-        alert = Alert(
-            website_id=website.id,
-            timestamp=datetime.utcnow(),
-            message=alert_msg,
-            resolved=False
-        )
-        db.add(alert)
-        from .notifications import send_alert_notification
-        send_alert_notification(db, alert_msg)
+    if is_check_success:
+        website.consecutive_failures = 0
+        website.status = "online"
         
-    elif not was_online and is_online and website.status != "unknown":
-        active_alerts = db.query(Alert).filter(
-            Alert.website_id == website.id,
-            Alert.resolved == False
-        ).all()
-        for alert in active_alerts:
-            alert.resolved = True
-            alert.resolved_at = datetime.utcnow()
-        from .notifications import send_alert_notification
-        send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE")
+        if not was_online and website.status != "unknown":
+            active_alerts = db.query(Alert).filter(
+                Alert.website_id == website.id,
+                Alert.resolved == False
+            ).all()
+            for alert in active_alerts:
+                alert.resolved = True
+                alert.resolved_at = datetime.utcnow()
+            from .notifications import send_alert_notification
+            send_alert_notification(db, f"Website {website.name} ({website.url}) is back ONLINE", website.notification_group_id)
+    else:
+        website.consecutive_failures = (website.consecutive_failures or 0) + 1
+        threshold = website.failed_threshold or 1
+        
+        if website.consecutive_failures >= threshold:
+            if was_online or website.status == "unknown":
+                website.status = "offline"
+                alert_msg = f"Website {website.name} ({website.url}) is OFFLINE (HTTP: {website.status_code or 'FAIL'}, failed {website.consecutive_failures} times)"
+                alert = Alert(
+                    website_id=website.id,
+                    timestamp=datetime.utcnow(),
+                    message=alert_msg,
+                    resolved=False
+                )
+                db.add(alert)
+                from .notifications import send_alert_notification
+                send_alert_notification(db, alert_msg, website.notification_group_id)
+        else:
+            import logging
+            logging.getLogger("WebWorker").info(f"Website {website.name} ({website.url}) check failed ({website.consecutive_failures}/{threshold} attempts)")
         
     db.commit()

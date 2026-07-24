@@ -122,6 +122,101 @@ function initDashboard() {
         addModal.close();
     });
 
+    // Notification Groups Logic
+    async function loadNotificationGroups() {
+        try {
+            const res = await fetch("/api/notification-groups");
+            if (!res.ok) throw new Error("Gagal mengambil data group notifikasi.");
+            const groups = await res.json();
+            
+            // Populate dropdowns
+            const serverSelect = document.getElementById("notification_group_id");
+            const webSelect = document.getElementById("web_notification_group_id");
+            
+            const optionsHtml = '<option value="">Default (Semua Channel Global)</option>' + 
+                groups.map(g => `<option value="${g.id}">${g.name}</option>`).join("");
+                
+            if (serverSelect) serverSelect.innerHTML = optionsHtml;
+            if (webSelect) webSelect.innerHTML = optionsHtml;
+            
+            // Populate list inside modal
+            const listContainer = document.getElementById("notification-groups-list");
+            if (listContainer) {
+                if (groups.length === 0) {
+                    listContainer.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">Belum ada group notifikasi kustom.</p>';
+                } else {
+                    listContainer.innerHTML = groups.map(g => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; background: rgba(255,255,255,0.02);">
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">${g.name}</strong>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    ${g.telegram_chat_id ? '📱 Telegram ' : ''}
+                                    ${g.whatsapp_recipients ? '💬 WA ' : ''}
+                                    ${g.smtp_recipient ? '✉️ Email ' : ''}
+                                    ${(!g.telegram_chat_id && !g.whatsapp_recipients && !g.smtp_recipient) ? '(Tanpa target kustom)' : ''}
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444;" onclick="deleteNotificationGroup(${g.id})">Hapus</button>
+                        </div>
+                    `).join("");
+                }
+            }
+        } catch (error) {
+            console.error("Error loading notification groups:", error);
+        }
+    }
+
+    window.deleteNotificationGroup = async function(groupId) {
+        if (!confirm("Apakah Anda yakin ingin menghapus group notifikasi ini?")) return;
+        try {
+            const res = await fetch(`/api/notification-groups/${groupId}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Gagal menghapus group notifikasi.");
+            await loadNotificationGroups();
+        } catch (error) {
+            alert("Error: " + error.message);
+        }
+    };
+
+    const createGroupBtn = document.getElementById("create-group-btn");
+    if (createGroupBtn) {
+        createGroupBtn.addEventListener("click", async () => {
+            const name = document.getElementById("new_group_name").value;
+            const telegram_chat_id = document.getElementById("new_group_telegram").value || null;
+            const whatsapp_recipients = document.getElementById("new_group_whatsapp").value || null;
+            const smtp_recipient = document.getElementById("new_group_smtp").value || null;
+            
+            if (!name) {
+                alert("Nama group wajib diisi.");
+                return;
+            }
+            
+            try {
+                const res = await fetch("/api/notification-groups", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, telegram_chat_id, whatsapp_recipients, smtp_recipient })
+                });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.detail || "Gagal membuat group notifikasi.");
+                }
+                
+                // Clear fields
+                document.getElementById("new_group_name").value = "";
+                document.getElementById("new_group_telegram").value = "";
+                document.getElementById("new_group_whatsapp").value = "";
+                document.getElementById("new_group_smtp").value = "";
+                
+                await loadNotificationGroups();
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+        });
+    }
+
+    // Load notification groups on initial load
+    loadNotificationGroups();
+
     let cachedServers = [];
 
     // Drag and drop handler
@@ -389,10 +484,13 @@ function initDashboard() {
     addForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         
+        const rawGroupId = document.getElementById("notification_group_id").value;
         const payload = {
             name: document.getElementById("name").value,
             ip_address: document.getElementById("ip_address").value,
             monitor_type: monitorTypeSelect.value,
+            notification_group_id: rawGroupId ? parseInt(rawGroupId, 10) : null,
+            failed_threshold: parseInt(document.getElementById("failed_threshold").value, 10) || 1,
         };
 
         if (payload.monitor_type === "snmp") {
@@ -535,6 +633,9 @@ function initDashboard() {
                 document.getElementById("smtp_sender").value = settings.smtp_sender || "";
                 document.getElementById("smtp_recipient").value = settings.smtp_recipient || "";
                 
+                // Load custom notification groups
+                await loadNotificationGroups();
+                
                 alarmSettingsModal.showModal();
             } catch (error) {
                 alert("Error: " + error.message);
@@ -653,14 +754,15 @@ function initDashboard() {
     if (addWebForm && addWebModal) {
         addWebForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            const name = document.getElementById("web_name").value;
-            const url = document.getElementById("web_url").value;
+            const rawGroupId = document.getElementById("web_notification_group_id").value;
+            const notification_group_id = rawGroupId ? parseInt(rawGroupId, 10) : null;
+            const failed_threshold = parseInt(document.getElementById("web_failed_threshold").value, 10) || 1;
 
             try {
                 const res = await fetch("/api/websites", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name, url })
+                    body: JSON.stringify({ name, url, notification_group_id, failed_threshold })
                 });
 
                 if (!res.ok) {

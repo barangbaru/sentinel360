@@ -4,6 +4,15 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Foreig
 from sqlalchemy.orm import relationship
 from .database import Base
 
+class NotificationGroup(Base):
+    __tablename__ = "notification_groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True, index=True)
+    telegram_chat_id = Column(String, nullable=True)
+    whatsapp_recipients = Column(String, nullable=True)
+    smtp_recipient = Column(String, nullable=True)
+
 class Server(Base):
     __tablename__ = "servers"
 
@@ -33,6 +42,12 @@ class Server(Base):
 
     metrics = relationship("MetricHistory", back_populates="server", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="server", cascade="all, delete-orphan")
+
+    notification_group_id = Column(Integer, ForeignKey("notification_groups.id", ondelete="SET NULL"), nullable=True)
+    failed_threshold = Column(Integer, default=1, nullable=False)
+    consecutive_failures = Column(Integer, default=0, nullable=False)
+
+    notification_group = relationship("NotificationGroup")
 
 class MetricHistory(Base):
     __tablename__ = "metric_history"
@@ -89,6 +104,12 @@ class Website(Base):
     ssl_days_left = Column(Integer, nullable=True)
     last_checked = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
+
+    notification_group_id = Column(Integer, ForeignKey("notification_groups.id", ondelete="SET NULL"), nullable=True)
+    failed_threshold = Column(Integer, default=1, nullable=False)
+    consecutive_failures = Column(Integer, default=0, nullable=False)
+
+    notification_group = relationship("NotificationGroup")
 
 class SystemSettings(Base):
     __tablename__ = "system_settings"

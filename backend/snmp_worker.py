@@ -124,8 +124,8 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
     if sys_descr is None:
         # Device is offline / unreachable via SNMP
         was_online = server.status == "online"
-        server.status = "offline"
-        server.last_seen = datetime.utcnow()
+        server.consecutive_failures = (server.consecutive_failures or 0) + 1
+        threshold = server.failed_threshold or 1
         
         # Add offline metrics record
         metric = MetricHistory(
@@ -135,18 +135,24 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
         db.add(metric)
         
         # Handle alert
-        if was_online:
-            alert_msg = f"Server {server.name} ({server.ip_address}) is OFFLINE (SNMP query failed)"
-            alert = Alert(
-                server_id=server.id,
-                timestamp=datetime.utcnow(),
-                message=alert_msg,
-                resolved=False
-            )
-            db.add(alert)
-            logger.warning(f"ALERT: SNMP Server {server.name} went offline.")
-            from .notifications import send_alert_notification
-            send_alert_notification(db, alert_msg)
+        if server.consecutive_failures >= threshold:
+            if was_online or server.status == "unknown":
+                server.status = "offline"
+                server.last_seen = datetime.utcnow()
+                
+                alert_msg = f"Server {server.name} ({server.ip_address}) is OFFLINE (SNMP query failed {server.consecutive_failures} times)"
+                alert = Alert(
+                    server_id=server.id,
+                    timestamp=datetime.utcnow(),
+                    message=alert_msg,
+                    resolved=False
+                )
+                db.add(alert)
+                logger.warning(f"ALERT: SNMP Server {server.name} went offline.")
+                from .notifications import send_alert_notification
+                send_alert_notification(db, alert_msg, server.notification_group_id)
+        else:
+            logger.info(f"SNMP Server {server.name} query failed ({server.consecutive_failures}/{threshold} attempts)")
         
         db.commit()
         return False
@@ -242,6 +248,8 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
     )
     db.add(metric)
     
+    server.consecutive_failures = 0
+    server.status = "online"
     # Resolve any offline alerts
     if not was_online:
         active_alerts = db.query(Alert).filter(
@@ -253,7 +261,7 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
             alert.resolved_at = datetime.utcnow()
         logger.info(f"SNMP Server {server.name} came back online. Resolved active alerts.")
         from .notifications import send_alert_notification
-        send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE")
+        send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", server.notification_group_id)
         
     # Check threshold alerts (e.g. CPU/RAM > 90%)
     if avg_cpu and avg_cpu > 90.0:
@@ -272,7 +280,7 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 resolved=False
             ))
             from .notifications import send_alert_notification
-            send_alert_notification(db, msg)
+            send_alert_notification(db, msg, server.notification_group_id)
             
     if ram_usage_pct and ram_usage_pct > 90.0:
         existing_ram_alert = db.query(Alert).filter(
@@ -289,7 +297,7 @@ def poll_snmp_server(db: Session, server: Server) -> bool:
                 resolved=False
             ))
             from .notifications import send_alert_notification
-            send_alert_notification(db, msg)
+            send_alert_notification(db, msg, server.notification_group_id)
 
     db.commit()
     db.refresh(server)

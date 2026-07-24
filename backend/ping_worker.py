@@ -86,14 +86,12 @@ def perform_ping(ip_address: str, timeout_sec: int = 2) -> float | None:
 def ping_server(db: Session, server: Server):
     """
     Perform ping check on a single server, update status and store metrics.
+    Supports failed threshold check parameters before triggering alerts.
     """
     latency = perform_ping(server.ip_address)
     
     was_online = server.status == "online"
     is_online = latency is not None
-    
-    server.status = "online" if is_online else "offline"
-    server.last_seen = datetime.utcnow()
     
     # Save to history
     metric = MetricHistory(
@@ -103,37 +101,52 @@ def ping_server(db: Session, server: Server):
     )
     db.add(metric)
     
-    # Handle Alerts
-    if was_online and not is_online:
-        # Server went offline, create alert
-        alert_msg = f"Server {server.name} ({server.ip_address}) is OFFLINE (Ping failed)"
-        alert = Alert(
-            server_id=server.id,
-            timestamp=datetime.utcnow(),
-            message=alert_msg,
-            resolved=False
-        )
-        db.add(alert)
-        logger.warning(f"ALERT: Server {server.name} ({server.ip_address}) went offline!")
+    if is_online:
+        server.consecutive_failures = 0
+        server.last_seen = datetime.utcnow()
         
-        # Send alert
-        from .notifications import send_alert_notification
-        send_alert_notification(db, alert_msg)
+        if not was_online and server.status != "unknown":
+            server.status = "online"
+            # Server came back online, resolve active alerts
+            active_alerts = db.query(Alert).filter(
+                Alert.server_id == server.id,
+                Alert.resolved == False
+            ).all()
+            for alert in active_alerts:
+                alert.resolved = True
+                alert.resolved_at = datetime.utcnow()
+            logger.info(f"Server {server.name} ({server.ip_address}) came back online. Resolved active alerts.")
+            
+            # Send resolution alert
+            from .notifications import send_alert_notification
+            send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE", server.notification_group_id)
+        else:
+            server.status = "online"
+    else:
+        # Increment consecutive failures
+        server.consecutive_failures = (server.consecutive_failures or 0) + 1
+        threshold = server.failed_threshold or 1
         
-    elif not was_online and is_online and server.status != "unknown":
-        # Server came back online, resolve active alerts
-        active_alerts = db.query(Alert).filter(
-            Alert.server_id == server.id,
-            Alert.resolved == False
-        ).all()
-        for alert in active_alerts:
-            alert.resolved = True
-            alert.resolved_at = datetime.utcnow()
-        logger.info(f"Server {server.name} ({server.ip_address}) came back online. Resolved active alerts.")
-        
-        # Send resolution alert
-        from .notifications import send_alert_notification
-        send_alert_notification(db, f"Server {server.name} ({server.ip_address}) is back ONLINE")
+        if server.consecutive_failures >= threshold:
+            if was_online or server.status == "unknown":
+                server.status = "offline"
+                server.last_seen = datetime.utcnow()
+                
+                alert_msg = f"Server {server.name} ({server.ip_address}) is OFFLINE (Ping failed {server.consecutive_failures} times)"
+                alert = Alert(
+                    server_id=server.id,
+                    timestamp=datetime.utcnow(),
+                    message=alert_msg,
+                    resolved=False
+                )
+                db.add(alert)
+                logger.warning(f"ALERT: Server {server.name} ({server.ip_address}) went offline!")
+                
+                # Send alert
+                from .notifications import send_alert_notification
+                send_alert_notification(db, alert_msg, server.notification_group_id)
+        else:
+            logger.info(f"Server {server.name} ({server.ip_address}) ping failed ({server.consecutive_failures}/{threshold} attempts)")
 
     db.commit()
     db.refresh(server)

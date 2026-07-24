@@ -117,6 +117,19 @@
                     <option value="snmp">SNMP Poller (SNMP v2c - Agentless)</option>
                 </select>
             </div>
+            
+            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div>
+                    <label for="notification_group_id" class="form-label">Group Notifikasi</label>
+                    <select id="notification_group_id" class="form-select">
+                        <option value="">Default (Global)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="failed_threshold" class="form-label">Failed Threshold</label>
+                    <input type="number" id="failed_threshold" class="form-input" min="1" value="1" required>
+                </div>
+            </div>
 
             <!-- SNMP CONFIG FIELDS (Toggled in app.js) -->
             <div id="snmp-config-fields" style="display: none; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
@@ -159,7 +172,18 @@
                 <label for="web_url" class="form-label">URL Website (harus diawali http:// atau https://)</label>
                 <input type="url" id="web_url" class="form-input" placeholder="contoh: https://sentinel360.com" required>
             </div>
-
+            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div>
+                    <label for="web_notification_group_id" class="form-label">Group Notifikasi</label>
+                    <select id="web_notification_group_id" class="form-select">
+                        <option value="">Default (Global)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="web_failed_threshold" class="form-label">Failed Threshold</label>
+                    <input type="number" id="web_failed_threshold" class="form-input" min="1" value="1" required>
+                </div>
+            </div>
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Simpan Website</button>
             </div>
@@ -351,6 +375,34 @@
                         <label for="smtp_recipient" class="form-label">Penerima</label>
                         <input type="email" id="smtp_recipient" class="form-input" placeholder="recipient@gmail.com">
                     </div>
+                </div>
+            </div>
+
+            <!-- Custom Notification Groups Management -->
+            <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; background: rgba(255, 255, 255, 0.01);">
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-primary); font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">👥 Group Notifikasi (Kustom)</h3>
+                <div id="notification-groups-list" style="margin-bottom: 1rem; max-height: 200px; overflow-y: auto;">
+                    <!-- List of custom groups loaded dynamically -->
+                </div>
+                <div style="border: 1px dashed var(--accent); padding: 1rem; border-radius: 8px; background: rgba(99, 102, 241, 0.02);">
+                    <h4 style="margin: 0 0 0.75rem 0; color: var(--accent); font-size: 0.9rem;">Buat Group Notifikasi Baru</h4>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.75rem;">Nama Group</label>
+                        <input type="text" id="new_group_name" class="form-input" style="padding: 0.4rem;" placeholder="e.g. Tim Infra">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.75rem;">Telegram Chat ID (Opsional - default global)</label>
+                        <input type="text" id="new_group_telegram" class="form-input" style="padding: 0.4rem;" placeholder="e.g. -100123456789">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.75rem;">WhatsApp Recipient (Opsional - default global)</label>
+                        <input type="text" id="new_group_whatsapp" class="form-input" style="padding: 0.4rem;" placeholder="e.g. 6281234567890">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.75rem;">Email Recipient (Opsional - default global)</label>
+                        <input type="email" id="new_group_smtp" class="form-input" style="padding: 0.4rem;" placeholder="e.g. infra@sentinel360.com">
+                    </div>
+                    <button type="button" id="create-group-btn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem; padding: 0.4rem; font-size: 0.8rem; background: var(--bg-card); color: var(--accent); border-color: var(--accent);">+ Tambah Group</button>
                 </div>
             </div>
 
