@@ -267,9 +267,12 @@ success "Kode berhasil diperbarui."
 # ════════════════════════════════════════════════════════════════════════════
 header "[3/7] Update virtual environment"
 cd "$APP_DIR"
-rm -rf venv
-python3 -m venv venv
-venv/bin/pip install --upgrade pip -q
+
+if [ ! -d "venv" ]; then
+    info "Membuat virtual environment baru..."
+    python3 -m venv venv
+    venv/bin/pip install --upgrade pip -q
+fi
 
 # Tambahkan psycopg2-binary ke requirements jika PostgreSQL
 if [ "$DB_TYPE" = "postgresql" ]; then
@@ -278,10 +281,17 @@ if [ "$DB_TYPE" = "postgresql" ]; then
     fi
 fi
 
-# Bersihkan modul-modul lama untuk menghindari konflik namespace
-venv/bin/pip uninstall -y pysnmp-lextudio pysnmp pyasn1 || true
-venv/bin/pip install -r requirements.txt -q
-success "Dependencies up to date."
+info "Memeriksa dependencies..."
+DRY_RUN_OUT=$(venv/bin/pip install -r requirements.txt --dry-run 2>&1 || echo "error")
+
+if [ "$DRY_RUN_OUT" = "error" ] || echo "$DRY_RUN_OUT" | grep -q "Would install"; then
+    info "Menginstall/mengupdate dependencies..."
+    venv/bin/pip uninstall -y pysnmp-lextudio pysnmp pyasn1 || true
+    venv/bin/pip install -r requirements.txt -q
+    success "Dependencies berhasil diupdate."
+else
+    success "Dependencies sudah sesuai. Tidak ada perubahan."
+fi
 
 # ════════════════════════════════════════════════════════════════════════════
 # [4] File .env
