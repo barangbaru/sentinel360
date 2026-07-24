@@ -169,10 +169,43 @@ async def lifespan(app: FastAPI):
         db.close()
     yield
 
+def get_app_version() -> str:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    backend_version_path = os.path.join(base_dir, "version.txt")
+    if os.path.exists(backend_version_path):
+        try:
+            with open(backend_version_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+            
+    root_version_path = os.path.join(base_dir, "..", "version.txt")
+    if os.path.exists(root_version_path):
+        try:
+            with open(root_version_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+            
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
+        return result.stdout.strip()
+    except Exception:
+        pass
+        
+    return "v1.0.0"
+
 app = FastAPI(
     title="Sentinel360 Server Monitoring",
     description="Sentinel360 monitoring server for Linux and Windows",
-    version="1.0.0",
+    version=get_app_version(),
     lifespan=lifespan
 )
 
@@ -255,7 +288,8 @@ def change_password(
 async def read_dashboard(request: Request, current_user: User = Depends(get_current_user)):
     return templates.TemplateResponse(request, "index.html", {
         "username": current_user.username,
-        "role": current_user.role
+        "role": current_user.role,
+        "version": app.version
     })
 
 @app.get("/server/{server_id}", response_class=HTMLResponse)
@@ -263,7 +297,8 @@ async def read_server_details(request: Request, server_id: int, current_user: Us
     return templates.TemplateResponse(request, "server_detail.html", {
         "server_id": server_id,
         "username": current_user.username,
-        "role": current_user.role
+        "role": current_user.role,
+        "version": app.version
     })
 
 @app.get("/tv", response_class=HTMLResponse)

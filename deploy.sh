@@ -13,7 +13,7 @@ TARGET_VERSION=""
 AUTO_MODE=false   # --auto: skip semua prompt, pakai config .env yang ada
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --version) TARGET_VERSION="$2"; shift 2 ;;
+        --version) TARGET_VERSION="${2#v}"; shift 2 ;;
         --auto)    AUTO_MODE=true; shift ;;
         *) shift ;;
     esac
@@ -64,7 +64,7 @@ if $IS_UPDATE; then
     # Fetch semua tag dari GitHub tanpa clone (ls-remote jauh lebih cepat)
     apt-get install -y git -qq 2>/dev/null || true
     ALL_TAGS=$(git ls-remote --tags --refs "$REPO_URL" 2>/dev/null \
-        | awk '{print $2}' | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true)
+        | awk -F'/' '{print $NF}' | grep -E '^v[0-9]+' | sort -V || true)
 
     # Ambil versi latest dari tag
     LATEST_TAG=$(echo "$ALL_TAGS" | tail -1)
@@ -73,13 +73,16 @@ if $IS_UPDATE; then
     info "Versi terinstall : $CURRENT_VERSION"
     info "Versi terbaru    : ${LATEST_VERSION:-main (no tags)}"
 
+    NORM_CURRENT=${CURRENT_VERSION#v}
+    NORM_LATEST=${LATEST_VERSION#v}
+
     if [ -n "$TARGET_VERSION" ]; then
         # Versi sudah ditentukan via --version, langsung pakai
         info "Target versi     : v$TARGET_VERSION"
-    elif [ -n "$ALL_TAGS" ] && [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+    elif [ -n "$ALL_TAGS" ] && [ "$NORM_CURRENT" != "$NORM_LATEST" ]; then
         # Cari tag yang lebih baru dari yang terinstall
         if [ "$CURRENT_VERSION" != "(belum terinstall)" ] && [ "$CURRENT_VERSION" != "unknown" ]; then
-            NEWER_TAGS=$(echo "$ALL_TAGS" | awk -v cur="v$CURRENT_VERSION" 'BEGIN{found=0} $0==cur{found=1; next} found{print}')
+            NEWER_TAGS=$(echo "$ALL_TAGS" | awk -v cur="v$NORM_CURRENT" 'BEGIN{found=0} $0==cur{found=1; next} found{print}')
         else
             NEWER_TAGS="$ALL_TAGS"
         fi
@@ -229,12 +232,12 @@ header "[2/7] Tarik kode dari GitHub"
 TMPDIR_DEPLOY=$(mktemp -d)
 if [ -n "$TARGET_VERSION" ]; then
     info "Clone tag v$TARGET_VERSION..."
-    git clone --depth=1 --branch "v$TARGET_VERSION" "$REPO_URL" "$TMPDIR_DEPLOY/repo" -q \
+    git clone --depth=50 --branch "v$TARGET_VERSION" "$REPO_URL" "$TMPDIR_DEPLOY/repo" -q \
         || { warn "Tag v$TARGET_VERSION tidak ditemukan, clone dari main..."; \
-             git clone --depth=1 "$REPO_URL" "$TMPDIR_DEPLOY/repo" -q; }
+             git clone --depth=50 --tags "$REPO_URL" "$TMPDIR_DEPLOY/repo" -q; }
 else
     info "Clone branch main (latest)..."
-    git clone --depth=1 "$REPO_URL" "$TMPDIR_DEPLOY/repo" -q
+    git clone --depth=50 --tags "$REPO_URL" "$TMPDIR_DEPLOY/repo" -q
 fi
 
 mkdir -p "$APP_DIR"
@@ -254,6 +257,7 @@ printf '%s\n%s\n%s\n' "$GIT_HASH" "$GIT_MSG" "$GIT_DATE" > "$APP_DIR/.git_info"
 
 # Dapatkan versi untuk ditulis ke file versi
 DEPLOYED_VERSION=$(git -C "$TMPDIR_DEPLOY/repo" describe --tags --always 2>/dev/null || echo "${TARGET_VERSION:-unknown}")
+echo "$DEPLOYED_VERSION" > "$APP_DIR/backend/version.txt"
 
 rm -rf "$TMPDIR_DEPLOY"
 success "Kode berhasil diperbarui."
