@@ -122,6 +122,13 @@ function initDashboard() {
         addModal.close();
     });
 
+    // Notification Groups Logic
+    async function loadNotificationGroups() {
+        try {
+            const res = await fetch("/api/notification-groups");
+            if (!res.ok) throw new Error("Gagal mengambil data group notifikasi.");
+            const groups = await res.json();
+
             // Populate checklists
             const addServerChecklist = document.getElementById("add_server_groups_checklist");
             const addWebChecklist = document.getElementById("add_web_groups_checklist");
