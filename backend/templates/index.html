@@ -142,7 +142,7 @@
                 <label class="form-label">Notifikasi Aktif (Multi-select)</label>
                 <div id="add_server_groups_checklist" 
                      hx-get="/api/partials/notifications/creation-checklist?input_name=server_group_ids" 
-                     hx-trigger="load" 
+                     hx-trigger="reload" 
                      hx-swap="innerHTML"
                      style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 0.35rem;">
                     <!-- Checked items are loaded dynamically via HTMX -->
@@ -204,7 +204,7 @@
                 <label class="form-label">Notifikasi Aktif (Multi-select)</label>
                 <div id="add_web_groups_checklist" 
                      hx-get="/api/partials/notifications/creation-checklist?input_name=web_group_ids" 
-                     hx-trigger="load" 
+                     hx-trigger="reload" 
                      hx-swap="innerHTML"
                      style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 0.35rem;">
                     <!-- Checked items are loaded dynamically via HTMX -->
@@ -323,7 +323,7 @@
             <!-- Setup List -->
             <div id="notifications-setup-list" 
                  hx-get="/api/partials/notifications/setup-list"
-                 hx-trigger="load"
+                 hx-trigger="reload"
                  hx-swap="innerHTML"
                  style="margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
                 <!-- Loaded dynamically via HTMX -->

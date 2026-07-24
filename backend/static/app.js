@@ -115,6 +115,7 @@ function initDashboard() {
     addServerBtn.addEventListener("click", () => {
         addForm.reset();
         snmpFields.style.display = "none";
+        htmx.trigger("#add_server_groups_checklist", "reload");
         addModal.showModal();
     });
 
@@ -203,9 +204,9 @@ function initDashboard() {
             const res = await fetch(`/api/notifications/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error("Gagal menghapus setup notifikasi.");
             resetNotificationForm();
-            htmx.trigger("#notifications-setup-list", "load");
-            htmx.trigger("#add_server_groups_checklist", "load");
-            htmx.trigger("#add_web_groups_checklist", "load");
+            htmx.trigger("#notifications-setup-list", "reload");
+            htmx.trigger("#add_server_groups_checklist", "reload");
+            htmx.trigger("#add_web_groups_checklist", "reload");
         } catch (error) {
             alert(error.message);
         }
@@ -267,9 +268,9 @@ function initDashboard() {
 
                 alert("Setup notifikasi berhasil disimpan!");
                 resetNotificationForm();
-                htmx.trigger("#notifications-setup-list", "load");
-                htmx.trigger("#add_server_groups_checklist", "load");
-                htmx.trigger("#add_web_groups_checklist", "load");
+                htmx.trigger("#notifications-setup-list", "reload");
+                htmx.trigger("#add_server_groups_checklist", "reload");
+                htmx.trigger("#add_web_groups_checklist", "reload");
             } catch (error) {
                 alert(error.message);
             }
@@ -308,12 +309,9 @@ function initDashboard() {
 
     window.manageWebsiteNotifications = function(webId) {
         const modal = document.getElementById("manage-website-groups-modal");
-        const container = document.getElementById("web-groups-checklist");
         document.getElementById("manage_web_id").value = webId;
 
-        container.setAttribute("hx-get", `/api/partials/websites/${webId}/notifications-form`);
-        htmx.process(container);
-        htmx.trigger(container, "load");
+        htmx.ajax('GET', `/api/partials/websites/${webId}/notifications-form`, '#web-groups-checklist');
 
         modal.showModal();
     };
@@ -541,7 +539,7 @@ function initDashboard() {
     if (alarmSettingsBtn && alarmSettingsModal) {
         alarmSettingsBtn.addEventListener("click", () => {
             resetNotificationForm();
-            htmx.trigger("#notifications-setup-list", "load");
+            htmx.trigger("#notifications-setup-list", "reload");
             alarmSettingsModal.showModal();
         });
     }
@@ -566,6 +564,7 @@ function initDashboard() {
     if (addWebsiteBtn && addWebModal) {
         addWebsiteBtn.addEventListener("click", () => {
             addWebForm.reset();
+            htmx.trigger("#add_web_groups_checklist", "reload");
             addWebModal.showModal();
         });
     }
