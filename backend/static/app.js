@@ -398,6 +398,13 @@ function initDashboard() {
         });
     }
 
+    const closeWebGroupsBottomBtn = document.getElementById("close-web-groups-bottom-btn");
+    if (closeWebGroupsBottomBtn && webGroupsModal) {
+        closeWebGroupsBottomBtn.addEventListener("click", () => {
+            webGroupsModal.close();
+        });
+    }
+
     // Save website groups
     const saveWebGroupsBtn = document.getElementById("save-web-groups-btn");
     if (saveWebGroupsBtn && webGroupsModal) {
@@ -823,6 +830,13 @@ function initDashboard() {
 
     if (cancelAlarmSettingsBtn && alarmSettingsModal) {
         cancelAlarmSettingsBtn.addEventListener("click", () => {
+            alarmSettingsModal.close();
+        });
+    }
+
+    const closeAlarmSettingsBottomBtn = document.getElementById("close-alarm-settings-bottom-btn");
+    if (closeAlarmSettingsBottomBtn && alarmSettingsModal) {
+        closeAlarmSettingsBottomBtn.addEventListener("click", () => {
             alarmSettingsModal.close();
         });
     }
