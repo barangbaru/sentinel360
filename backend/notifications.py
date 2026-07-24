@@ -1,6 +1,7 @@
 import smtplib
 import logging
 import requests
+from typing import Optional
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -88,11 +89,13 @@ def send_alert_notification(db: Session, message: str, notification_config_id: O
     # 1. Telegram Notification
     if telegram_enabled and telegram_bot_token and telegram_chat_id:
         try:
+            import html
+            safe_msg = html.escape(message)
             url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
             payload = {
                 "chat_id": telegram_chat_id,
-                "text": f"⚠️ *Sentinel360 ALERT*\n\n{message}",
-                "parse_mode": "Markdown"
+                "text": f"⚠️ <b>Sentinel360 ALERT</b>\n\n{safe_msg}",
+                "parse_mode": "HTML"
             }
             res = requests.post(url, json=payload, timeout=5)
             if res.ok:
