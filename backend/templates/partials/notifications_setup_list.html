@@ -17,6 +17,7 @@
                 </div>
             </div>
             <div style="display: flex; gap: 0.25rem;">
+                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--online); color: var(--online);" onclick="testNotificationConfigDirect({{ c.id }}, this)">Test</button>
                 <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--accent);" onclick="editNotificationConfig({{ c.id }})">Edit</button>
                 <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444;" onclick="deleteNotificationConfig({{ c.id }})">Hapus</button>
             </div>

@@ -307,6 +307,23 @@ function initDashboard() {
         });
     }
 
+    window.testNotificationConfigDirect = async function(id, btnElement) {
+        if (!id) return;
+        const originalText = btnElement.textContent;
+        btnElement.disabled = true;
+        btnElement.textContent = "Testing...";
+        try {
+            const res = await fetch(`/api/notifications/${id}/test`, { method: "POST" });
+            if (!res.ok) throw new Error("Gagal mengirim notifikasi uji coba.");
+            alert("Notifikasi uji coba berhasil dikirim ke saluran setup ini!");
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            btnElement.disabled = false;
+            btnElement.textContent = originalText;
+        }
+    };
+
     window.manageWebsiteNotifications = function(webId) {
         const modal = document.getElementById("manage-website-groups-modal");
         document.getElementById("manage_web_id").value = webId;
