@@ -998,8 +998,8 @@ function initDashboard() {
                     </div>` : ""}
 
                     <div class="server-footer" style="margin-top: auto; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--accent); color: var(--text-primary);" onclick="manageWebsiteGroups(${web.id})">
-                            🔔 Group
+                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--accent); color: var(--text-primary);" onclick="manageWebsiteNotifications(${web.id})">
+                            🔔 Notifikasi
                         </button>
                         <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444; ${hideDeleteBtn}" onclick="deleteWebsite(${web.id})">
                             Hapus
